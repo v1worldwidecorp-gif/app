@@ -1,0 +1,1052 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>APEXVERSE PRIME ($APV) — Telegram Mini App</title>
+    <!-- Telegram WebApp SDK for native viewport expansion & haptic feedback -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Tailwind CSS for responsive mobile-first utility layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter, Orbitron, and JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet"
+    />
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        orbitron: ['Orbitron', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        /* Base viewport rules: prevent accidental horizontal scroll and keep clean Web3 dark canvas */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100vh;
+            background-color: #020611;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Lock 100vw x 100vh strictly during the static loading phase */
+        body.loader-active {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden !important;
+        }
+
+        /* Static non-moving full-screen loader (100vw x 100vh) */
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            transform: none !important;
+            animation: none !important;
+            z-index: 9999;
+        }
+
+        /* Static character artwork: zero shake, zero pan, zero movement */
+        #characterArtwork {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            transform: none !important;
+            animation: none !important;
+            pointer-events: none;
+        }
+
+        /* Glowing segmented blue fill bar (1% -> 100%) */
+        .segmented-blue-bar {
+            background-image:
+                repeating-linear-gradient(
+                    -55deg,
+                    rgba(255, 255, 255, 0.35) 0px,
+                    rgba(255, 255, 255, 0.35) 6px,
+                    rgba(2, 132, 199, 0.25) 6px,
+                    rgba(2, 132, 199, 0.25) 12px
+                ),
+                linear-gradient(90deg, #0284c7 0%, #00d2ff 58%, #7dd3fc 100%);
+            box-shadow: 0 0 18px rgba(0, 210, 255, 0.85), inset 0 0 8px rgba(255, 255, 255, 0.45);
+            transition: width 85ms linear;
+        }
+
+        /* HUD corner brackets around the progress bar */
+        .hud-corner {
+            position: absolute;
+            width: 11px;
+            height: 11px;
+            border-color: #38bdf8;
+            pointer-events: none;
+        }
+
+        /* Subtle Web3 grid for main app background */
+        .apv-grid-bg {
+            background-image:
+                linear-gradient(to right, rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+
+        .apv-card {
+            background: rgba(7, 17, 38, 0.85);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 189, 248, 0.24);
+            box-shadow: 0 12px 34px rgba(0, 0, 0, 0.48);
+        }
+
+        .apv-subcard {
+            background: rgba(3, 10, 24, 0.82);
+            border: 1px solid rgba(56, 189, 248, 0.18);
+        }
+
+        .tap-ring-surface {
+            box-shadow:
+                0 0 0 2px rgba(56, 189, 248, 0.45),
+                0 0 38px rgba(14, 165, 233, 0.42),
+                inset 0 0 32px rgba(0, 210, 255, 0.22);
+        }
+
+        @keyframes tapRingPress {
+            0% { transform: scale(1); }
+            45% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+
+        .tap-ring-press {
+            animation: tapRingPress 0.16s ease-out;
+        }
+
+        @keyframes circularBadgeRise {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, 0) scale(0.85);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -48px) scale(1.08);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -88px) scale(0.95);
+            }
+        }
+
+        .floating-circular-ten {
+            position: absolute;
+            pointer-events: none;
+            z-index: 40;
+            animation: circularBadgeRise 0.85s ease-out forwards;
+        }
+
+        .nav-btn-active {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.32), rgba(0, 210, 255, 0.18));
+            border-color: rgba(56, 189, 248, 0.92) !important;
+            color: #e0f2fe !important;
+            box-shadow: 0 0 18px rgba(56, 189, 248, 0.38);
+        }
+
+        .nav-btn-inactive {
+            background: rgba(15, 23, 42, 0.78);
+            border-color: rgba(148, 163, 184, 0.22);
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body class="loader-active bg-[#020611] text-slate-100">
+    <!-- =====================================================================
+         1. STATIC FULL-SCREEN LOADING SCREEN (1% -> 100%, 100vw x 100vh)
+         Anchored cleanly at lower feet/paws zone; zero movement/shake
+         ===================================================================== -->
+    <div id="loadingOverlay" aria-label="APEXVERSE PRIME Static Loading Screen">
+        <img
+            id="characterArtwork"
+            src="https://i.ibb.co/5hKGb3cV/1795339027751.png"
+            alt="APEXVERSE PRIME Character Visual"
+            onerror="this.onerror=null; this.src='https://placehold.co/1920x1080/031024/00d2ff?text=APEXVERSE+PRIME+%24APV';"
+        />
+
+        <!-- Subtle Vignette Overlay -->
+        <div
+            class="absolute inset-0 pointer-events-none"
+            style="background: radial-gradient(circle at 50% 42%, rgba(2, 10, 26, 0.08) 0%, rgba(2, 6, 17, 0.58) 72%, rgba(2, 6, 17, 0.88) 100%);"
+        ></div>
+
+        <!-- Cyan Wave Canvas Anchored at Lower Feet/Paws Zone -->
+        <canvas id="cyanWaveCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+
+        <!-- Lower Feet/Paws Zone Progress Bar & Subsystem Statuses -->
+        <div class="absolute inset-x-0 bottom-5 sm:bottom-8 px-4 flex flex-col items-center pointer-events-none">
+            <div class="w-full max-w-2xl rounded-2xl bg-[#030b1c]/88 backdrop-blur-md border border-cyan-400/35 px-4 sm:px-6 py-3.5 shadow-[0_0_32px_rgba(0,180,255,0.28)]">
+                <div class="flex items-center justify-between gap-3 mb-2.5">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_#22d3ee] shrink-0"></span>
+                        <span class="font-orbitron text-xs sm:text-sm font-extrabold tracking-wider text-cyan-200 uppercase truncate">
+                            APEXVERSE PRIME ($APV) LOADING
+                        </span>
+                    </div>
+                    <span
+                        id="loaderPercentText"
+                        class="font-orbitron text-xl sm:text-2xl font-black tracking-wider text-sky-400 drop-shadow-[0_0_14px_rgba(56,189,248,0.85)] shrink-0"
+                    >
+                        1%
+                    </span>
+                </div>
+
+                <!-- Segmented Glowing Blue Progress Bar -->
+                <div class="relative w-full h-4 sm:h-5 rounded-md bg-slate-950/90 border border-cyan-400/45 p-0.5 overflow-hidden">
+                    <span class="hud-corner top-0 left-0 border-t-2 border-l-2"></span>
+                    <span class="hud-corner top-0 right-0 border-t-2 border-r-2"></span>
+                    <span class="hud-corner bottom-0 left-0 border-b-2 border-l-2"></span>
+                    <span class="hud-corner bottom-0 right-0 border-b-2 border-r-2"></span>
+                    <div id="loaderBarFill" class="h-full rounded-sm segmented-blue-bar" style="width: 1%;"></div>
+                </div>
+
+                <!-- Subsystem Initialization Lines -->
+                <div class="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2 font-mono text-[10px] sm:text-[11px] tracking-wide">
+                    <div id="subsysContracts" class="flex items-center gap-1.5 text-cyan-200">
+                        <span id="dotContracts" class="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"></span>
+                        <span class="truncate">INITIALIZING SMART CONTRACTS...</span>
+                    </div>
+                    <div id="subsysLiquidity" class="flex items-center gap-1.5 text-cyan-300/55">
+                        <span id="dotLiquidity" class="w-1.5 h-1.5 rounded-full bg-cyan-500/40 shrink-0"></span>
+                        <span class="truncate">PROVISIONING LIQUIDITY...</span>
+                    </div>
+                    <div id="subsysNetwork" class="flex items-center gap-1.5 text-cyan-300/55">
+                        <span id="dotNetwork" class="w-1.5 h-1.5 rounded-full bg-cyan-500/40 shrink-0"></span>
+                        <span class="truncate">SECURING BLOCKCHAIN NETWORK...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         2. MAIN TELEGRAM MINI-APP DASHBOARD (OPENS DIRECTLY TO TAP VIEW)
+         Strictly $APV token economy (zero rupees/INR/fiat anywhere)
+         ===================================================================== -->
+    <div id="miniAppContainer" class="hidden min-h-screen w-full apv-grid-bg relative flex flex-col justify-between pb-24">
+        <!-- Ambient Radial Glows -->
+        <div class="fixed -top-28 left-1/2 -translate-x-1/2 w-[560px] h-[300px] bg-sky-500/15 rounded-full blur-[120px] pointer-events-none"></div>
+        <div class="fixed bottom-16 right-0 w-[380px] h-[260px] bg-cyan-500/10 rounded-full blur-[110px] pointer-events-none"></div>
+
+        <div class="relative z-10 w-full max-w-4xl mx-auto px-4 sm:px-8 pt-4 sm:pt-6 space-y-5">
+            <!-- HEADER: Official APEX VERSE PRIME Circular Logo + APEXVERSE PRIME ($APV) + Live $APV Balance + Replay Loader -->
+            <header class="apv-card rounded-2xl px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3.5 min-w-0">
+                    <!-- Official APEX VERSE PRIME Circular Logo Badge -->
+                    <div
+                        id="companyLogoSlot"
+                        aria-label="APEX VERSE PRIME Official Circular Logo"
+                        class="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full p-0.5 bg-gradient-to-tr from-sky-500 via-cyan-300 to-blue-600 shadow-[0_0_20px_rgba(56,189,248,0.65)] shrink-0 overflow-hidden"
+                    >
+                        <div class="w-full h-full rounded-full bg-[#06101e] overflow-hidden flex items-center justify-center">
+                            <img
+                                id="headerLogoImg"
+                                src="https://i.ibb.co/PnZZhH6/1795408326087.png"
+                                alt="APEX VERSE PRIME Official Logo"
+                                class="w-full h-full object-cover object-center scale-110 rounded-full"
+                                onerror="this.onerror=null; this.src='https://placehold.co/200x200/06101e/38bdf8?text=APV';"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h1 class="font-orbitron text-sm sm:text-xl font-black tracking-wider text-white truncate">
+                                APEXVERSE PRIME
+                            </h1>
+                            <span class="px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/50 font-orbitron text-[10px] sm:text-xs font-extrabold text-sky-300 shrink-0">
+                                $APV
+                            </span>
+                        </div>
+                        <div class="font-mono text-[11px] text-slate-400 truncate">
+                            Telegram Mini App • $APV Token Hub
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2.5 shrink-0">
+                    <div class="apv-subcard rounded-xl px-3.5 py-2 text-right">
+                        <div class="text-[10px] uppercase tracking-wider text-slate-400">$APV Balance</div>
+                        <div class="font-orbitron text-sm sm:text-base font-black text-sky-300">
+                            <span id="headerBalanceValue">0</span> <span class="text-[11px] text-sky-400">$APV</span>
+                        </div>
+                    </div>
+
+                    <button
+                        id="replayLoaderAction"
+                        type="button"
+                        class="px-3 py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/50 text-sky-200 font-orbitron text-[11px] font-bold tracking-wide transition cursor-pointer"
+                    >
+                        Replay Loader
+                    </button>
+                </div>
+            </header>
+
+            <!-- TAB 1: TAP (DEFAULT ACTIVE SCREEN) -->
+            <section id="tab-tap" aria-label="Tap to Earn View" class="space-y-5">
+                <div class="apv-card rounded-3xl p-5 sm:p-8 min-h-[450px] sm:min-h-[500px] flex flex-col items-center justify-between gap-6">
+                    <!-- Live $APV Token Counter -->
+                    <div class="w-full max-w-md apv-subcard rounded-2xl px-5 py-3.5 flex items-center justify-between">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Earned Tokens</span>
+                        <div class="font-orbitron text-xl sm:text-2xl font-black text-white">
+                            <span id="tapBalanceValue">0</span>
+                            <span class="text-xs sm:text-sm font-bold text-sky-400 ml-1">$APV Tokens</span>
+                        </div>
+                    </div>
+
+                    <!-- Center Circular Tap Ring (+10 $APV Tokens & Floating Circular "10" Badge) -->
+                    <div id="tapArena" class="relative flex flex-col items-center justify-center my-auto py-2">
+                        <button
+                            id="circularTapRingBtn"
+                            type="button"
+                            aria-label="Tap circular button to earn 10 $APV Tokens"
+                            class="w-60 h-60 sm:w-72 sm:h-72 rounded-full border-2 border-sky-300/85 bg-[#06101e] tap-ring-surface flex items-center justify-center transition-transform cursor-pointer focus:outline-none relative overflow-hidden p-0"
+                        >
+                            <!-- Full-bleed circular tap artwork fitted cleanly inside the circle -->
+                            <img
+                                id="tapCenterLogoImg"
+                                src="https://i.ibb.co/C3CXhm2M/1795408867326.png"
+                                alt="APEX VERSE PRIME Tap Button"
+                                class="w-full h-full object-cover object-center scale-[1.18] rounded-full pointer-events-none select-none"
+                                onerror="this.onerror=null; this.src='https://placehold.co/400x400/06101e/38bdf8?text=TAP+10+%24APV';"
+                            />
+                            <!-- Subtle radial rim gloss to blend seamlessly into the outer glowing ring -->
+                            <div
+                                class="absolute inset-0 rounded-full pointer-events-none"
+                                style="box-shadow: inset 0 0 22px rgba(2, 6, 17, 0.75);"
+                            ></div>
+                        </button>
+                    </div>
+
+                    <!-- Glowing Blue "10" Readout Directly Above Bottom Navigation Bar -->
+                    <div class="w-full flex items-center justify-center pt-1">
+                        <div class="px-7 py-2.5 rounded-2xl bg-sky-950/75 border border-sky-400/60 shadow-[0_0_26px_rgba(56,189,248,0.5)] flex items-center gap-3">
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_10px_#38bdf8]"></span>
+                            <span
+                                id="bottomBlueTenReadout"
+                                class="font-orbitron text-3xl sm:text-4xl font-black text-sky-400 drop-shadow-[0_0_16px_rgba(56,189,248,0.9)]"
+                            >
+                                10
+                            </span>
+                            <span class="font-mono text-xs font-bold uppercase tracking-wider text-sky-300">
+                                $APV / Tap
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Token-Based Upgrade, Quest & Profile Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Token Upgrade Card -->
+                    <div class="apv-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4">
+                        <div>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-mono text-[11px] uppercase tracking-wider text-sky-400">Token Upgrade</span>
+                                <span id="coreLevelText" class="font-mono text-xs font-bold text-cyan-200">Lv. 1</span>
+                            </div>
+                            <h3 class="font-orbitron text-sm sm:text-base font-bold text-white mt-1">
+                                Prime Core Boost
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-1">
+                                Spend 100 $APV tokens to unlock a +15 $APV token core bonus.
+                            </p>
+                        </div>
+                        <button
+                            id="buyCoreUpgradeBtn"
+                            type="button"
+                            class="w-full py-2.5 px-3 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/50 text-sky-200 font-orbitron text-xs font-bold transition cursor-pointer"
+                        >
+                            Upgrade (100 $APV)
+                        </button>
+                    </div>
+
+                    <!-- Token Quest Card -->
+                    <div class="apv-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4">
+                        <div>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-mono text-[11px] uppercase tracking-wider text-sky-400">Token Quest</span>
+                                <span id="questBadgeText" class="font-mono text-xs font-bold text-emerald-300">Available</span>
+                            </div>
+                            <h3 class="font-orbitron text-sm sm:text-base font-bold text-white mt-1">
+                                Daily Prime Check-In
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-1">
+                                Claim your daily +25 $APV token reward in the mini app.
+                            </p>
+                        </div>
+                        <button
+                            id="claimQuestBtn"
+                            type="button"
+                            class="w-full py-2.5 px-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-orbitron text-xs font-extrabold transition cursor-pointer"
+                        >
+                            Claim +25 $APV
+                        </button>
+                    </div>
+
+                    <!-- Token Profile Card -->
+                    <div class="apv-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4">
+                        <div>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-mono text-[11px] uppercase tracking-wider text-sky-400">Token Profile</span>
+                                <span class="font-mono text-xs font-bold text-sky-300">$APV</span>
+                            </div>
+                            <h3 class="font-orbitron text-sm sm:text-base font-bold text-white mt-1">
+                                APEXVERSE Member
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-1">
+                                Total Taps: <span id="profileTapCountText" class="text-sky-300 font-mono font-bold">0</span>
+                            </p>
+                        </div>
+                        <div class="apv-subcard rounded-xl px-3 py-2 flex items-center justify-between font-mono text-xs">
+                            <span class="text-slate-400">Ticker</span>
+                            <span class="text-cyan-300 font-bold">$APV COIN</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: REFERRAL -->
+            <section id="tab-referral" aria-label="Referral View" class="hidden apv-card rounded-3xl p-5 sm:p-8 space-y-6">
+                <div>
+                    <h2 class="font-orbitron text-lg sm:text-2xl font-extrabold text-white tracking-wider">
+                        REFERRAL HUB ($APV)
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                        Share your invite link and earn +100 $APV tokens for every referred friend.
+                    </p>
+                </div>
+
+                <!-- Referral Count & Bonus in $APV Tokens -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="apv-subcard rounded-2xl p-4 sm:p-5">
+                        <div class="text-xs uppercase tracking-wider text-slate-400">Friends Invited</div>
+                        <div id="referralCountText" class="font-orbitron text-2xl sm:text-3xl font-black text-white mt-1.5">
+                            0
+                        </div>
+                    </div>
+                    <div class="apv-subcard rounded-2xl p-4 sm:p-5">
+                        <div class="text-xs uppercase tracking-wider text-slate-400">Referral Bonus</div>
+                        <div id="referralBonusText" class="font-orbitron text-2xl sm:text-3xl font-black text-sky-400 mt-1.5">
+                            0 $APV Tokens
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Copyable Invite Link -->
+                <div class="apv-subcard rounded-2xl p-4 sm:p-5 space-y-3">
+                    <label for="inviteLinkField" class="block text-xs font-semibold uppercase tracking-wider text-sky-300">
+                        Copyable Invite Link
+                    </label>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input
+                            id="inviteLinkField"
+                            type="text"
+                            readonly
+                            value="https://t.me/ApexversePrimeBot?start=APV_INVITE"
+                            class="flex-1 px-4 py-3 rounded-xl bg-slate-950 border border-sky-400/35 font-mono text-xs sm:text-sm text-sky-200 focus:outline-none"
+                        />
+                        <button
+                            id="copyInviteBtn"
+                            type="button"
+                            class="px-5 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-orbitron text-xs font-extrabold tracking-wide transition cursor-pointer"
+                        >
+                            Copy Link
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Add Friend Referral Reward & Friend Reward History -->
+                <div class="apv-subcard rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <div class="text-sm font-bold text-white">Record Friend Referral</div>
+                        <div class="text-xs text-slate-400 mt-0.5">Adds +1 friend and credits +100 $APV tokens.</div>
+                    </div>
+                    <button
+                        id="recordReferralBtn"
+                        type="button"
+                        class="px-4 py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/50 text-sky-200 font-orbitron text-xs font-bold cursor-pointer"
+                    >
+                        +100 $APV Friend
+                    </button>
+                </div>
+
+                <div class="apv-subcard rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div class="text-xs font-bold uppercase tracking-wider text-sky-300">
+                        Friend Reward History
+                    </div>
+                    <div id="friendRewardHistory" class="space-y-2 text-xs sm:text-sm font-mono"></div>
+                </div>
+            </section>
+
+            <!-- TAB 3: WALLET -->
+            <section id="tab-wallet" aria-label="Wallet View" class="hidden apv-card rounded-3xl p-5 sm:p-8 space-y-6">
+                <div>
+                    <h2 class="font-orbitron text-lg sm:text-2xl font-extrabold text-white tracking-wider">
+                        $APV WALLET
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                        View your $APV token balance, claim or transfer tokens, and inspect your transaction log.
+                    </p>
+                </div>
+
+                <!-- $APV Token Balance + Claim / Transfer Actions -->
+                <div class="apv-subcard rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <div class="text-xs uppercase tracking-wider text-slate-400">Available Balance</div>
+                        <div class="font-orbitron text-2xl sm:text-4xl font-black text-sky-400 mt-1">
+                            <span id="walletBalanceValue">0</span>
+                            <span class="text-sm sm:text-base font-bold text-cyan-200 ml-1">$APV Tokens</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button
+                            id="claimTokensBtn"
+                            type="button"
+                            class="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-orbitron text-xs font-extrabold cursor-pointer"
+                        >
+                            Claim +50 $APV
+                        </button>
+                        <button
+                            id="transferTokensBtn"
+                            type="button"
+                            class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-sky-400/45 text-sky-200 font-orbitron text-xs font-bold cursor-pointer"
+                        >
+                            Transfer 10 $APV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Token Transaction Log -->
+                <div class="apv-subcard rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div class="text-xs font-bold uppercase tracking-wider text-sky-300">
+                        Token Transaction Log
+                    </div>
+                    <div id="tokenTransactionLog" class="space-y-2 text-xs sm:text-sm font-mono"></div>
+                </div>
+            </section>
+        </div>
+
+        <!-- BOTTOM NAVIGATION BAR: TAP, REFERRAL, WALLET -->
+        <nav
+            aria-label="Primary Navigation"
+            class="fixed bottom-0 inset-x-0 z-30 bg-[#030b1c]/95 backdrop-blur-xl border-t border-sky-400/30 px-4 py-3"
+        >
+            <div class="max-w-2xl mx-auto grid grid-cols-3 gap-3">
+                <button
+                    type="button"
+                    data-nav="tap"
+                    class="apv-nav-btn py-2.5 px-3 rounded-xl border font-orbitron text-xs sm:text-sm font-bold tracking-wide transition cursor-pointer nav-btn-active"
+                >
+                    Tap
+                </button>
+                <button
+                    type="button"
+                    data-nav="referral"
+                    class="apv-nav-btn py-2.5 px-3 rounded-xl border font-orbitron text-xs sm:text-sm font-bold tracking-wide transition cursor-pointer nav-btn-inactive"
+                >
+                    Referral
+                </button>
+                <button
+                    type="button"
+                    data-nav="wallet"
+                    class="apv-nav-btn py-2.5 px-3 rounded-xl border font-orbitron text-xs sm:text-sm font-bold tracking-wide transition cursor-pointer nav-btn-inactive"
+                >
+                    Wallet
+                </button>
+            </div>
+        </nav>
+
+        <!-- Toast Feedback Banner -->
+        <div
+            id="apvToast"
+            class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-sky-950/95 border border-sky-400 text-sky-100 text-xs font-semibold shadow-[0_0_20px_rgba(56,189,248,0.5)] opacity-0 pointer-events-none transition-opacity duration-200 whitespace-nowrap"
+        ></div>
+    </div>
+
+    <script>
+        /**
+         * APEXVERSE PRIME ($APV) Telegram Mini App State & UI Engine
+         * - Static 100vw x 100vh loader (1% -> 100%) anchored at lower feet/paws zone
+         * - Official APEX VERSE PRIME logo (https://i.ibb.co/PnZZhH6/1795408326087.png) in header circle & tap emblem
+         * - Opens directly to Tap screen with +10 $APV tokens per tap
+         * - Persists tokens, referrals, quests, upgrades, and transaction history in localStorage
+         */
+
+        const OFFICIAL_LOGO_URL = "https://i.ibb.co/PnZZhH6/1795408326087.png";
+        const TAP_CIRCLE_ARTWORK_URL = "https://i.ibb.co/C3CXhm2M/1795408867326.png";
+        const TAP_TOKEN_REWARD = 10;
+        const REFERRAL_TOKEN_REWARD = 100;
+        const STORAGE_KEY = "apexverse_prime_apv_miniapp_v3";
+
+        const DEFAULT_STATE = {
+            balance: 0,
+            totalTaps: 0,
+            coreLevel: 1,
+            dailyQuestClaimed: false,
+            referrals: 0,
+            referralBonus: 0,
+            referralHistory: [],
+            transactions: [
+                {
+                    id: "init-apv-1",
+                    label: "APEXVERSE PRIME ($APV) Mini App Initialized",
+                    amount: "+0 $APV",
+                    positive: true,
+                    time: "Ready",
+                },
+            ],
+        };
+
+        let appState = structuredClone(DEFAULT_STATE);
+
+        // DOM References
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const miniAppContainer = document.getElementById('miniAppContainer');
+        const loaderPercentText = document.getElementById('loaderPercentText');
+        const loaderBarFill = document.getElementById('loaderBarFill');
+        const cyanWaveCanvas = document.getElementById('cyanWaveCanvas');
+
+        const subsysContracts = document.getElementById('subsysContracts');
+        const subsysLiquidity = document.getElementById('subsysLiquidity');
+        const subsysNetwork = document.getElementById('subsysNetwork');
+        const dotContracts = document.getElementById('dotContracts');
+        const dotLiquidity = document.getElementById('dotLiquidity');
+        const dotNetwork = document.getElementById('dotNetwork');
+
+        const headerBalanceValue = document.getElementById('headerBalanceValue');
+        const tapBalanceValue = document.getElementById('tapBalanceValue');
+        const walletBalanceValue = document.getElementById('walletBalanceValue');
+        const circularTapRingBtn = document.getElementById('circularTapRingBtn');
+        const tapArena = document.getElementById('tapArena');
+        const replayLoaderAction = document.getElementById('replayLoaderAction');
+
+        const coreLevelText = document.getElementById('coreLevelText');
+        const buyCoreUpgradeBtn = document.getElementById('buyCoreUpgradeBtn');
+        const questBadgeText = document.getElementById('questBadgeText');
+        const claimQuestBtn = document.getElementById('claimQuestBtn');
+        const profileTapCountText = document.getElementById('profileTapCountText');
+
+        const referralCountText = document.getElementById('referralCountText');
+        const referralBonusText = document.getElementById('referralBonusText');
+        const inviteLinkField = document.getElementById('inviteLinkField');
+        const copyInviteBtn = document.getElementById('copyInviteBtn');
+        const recordReferralBtn = document.getElementById('recordReferralBtn');
+        const friendRewardHistory = document.getElementById('friendRewardHistory');
+
+        const claimTokensBtn = document.getElementById('claimTokensBtn');
+        const transferTokensBtn = document.getElementById('transferTokensBtn');
+        const tokenTransactionLog = document.getElementById('tokenTransactionLog');
+        const apvToast = document.getElementById('apvToast');
+
+        let loaderProgress = 1;
+        let loaderIntervalId = null;
+        let wavePhase = 0;
+        let waveAnimId = null;
+
+        function loadStateFromStorage() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    appState = {
+                        ...structuredClone(DEFAULT_STATE),
+                        ...parsed,
+                        referralHistory: Array.isArray(parsed.referralHistory) ? parsed.referralHistory : [],
+                        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : structuredClone(DEFAULT_STATE.transactions),
+                    };
+                }
+            } catch (err) {
+                appState = structuredClone(DEFAULT_STATE);
+            }
+        }
+
+        function saveStateToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            } catch (err) {
+                // Ignore storage quota errors in restricted environments
+            }
+        }
+
+        function showToast(message) {
+            apvToast.textContent = message;
+            apvToast.classList.remove('opacity-0');
+            apvToast.classList.add('opacity-100');
+            clearTimeout(apvToast._hideTimer);
+            apvToast._hideTimer = setTimeout(() => {
+                apvToast.classList.remove('opacity-100');
+                apvToast.classList.add('opacity-0');
+            }, 2100);
+        }
+
+        function formatNowTime() {
+            return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function recordTransaction(label, amountStr, positive = true) {
+            appState.transactions.unshift({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                label,
+                amount: amountStr,
+                positive,
+                time: formatNowTime(),
+            });
+            if (appState.transactions.length > 20) {
+                appState.transactions.length = 20;
+            }
+        }
+
+        function renderDashboard() {
+            const formatted = appState.balance.toLocaleString();
+            headerBalanceValue.textContent = formatted;
+            tapBalanceValue.textContent = formatted;
+            walletBalanceValue.textContent = formatted;
+
+            coreLevelText.textContent = `Lv. ${appState.coreLevel}`;
+            profileTapCountText.textContent = appState.totalTaps.toLocaleString();
+
+            if (appState.dailyQuestClaimed) {
+                questBadgeText.textContent = "Claimed";
+                questBadgeText.className = "font-mono text-xs font-bold text-slate-400";
+                claimQuestBtn.textContent = "Claimed (+25 $APV)";
+            } else {
+                questBadgeText.textContent = "Available";
+                questBadgeText.className = "font-mono text-xs font-bold text-emerald-300";
+                claimQuestBtn.textContent = "Claim +25 $APV";
+            }
+
+            referralCountText.textContent = appState.referrals.toLocaleString();
+            referralBonusText.textContent = `${appState.referralBonus.toLocaleString()} $APV Tokens`;
+
+            // Render Friend Reward History
+            if (appState.referralHistory.length === 0) {
+                friendRewardHistory.innerHTML = `<div class="text-slate-400 py-2">No friend referrals recorded yet. Share your link or tap +100 $APV Friend.</div>`;
+            } else {
+                friendRewardHistory.innerHTML = appState.referralHistory
+                    .map(
+                        (item) => `
+                        <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-950/85 border border-sky-400/20">
+                            <span class="text-slate-200 truncate">${item.friendLabel}</span>
+                            <span class="text-sky-400 font-bold shrink-0">+${item.reward} $APV • ${item.time}</span>
+                        </div>`
+                    )
+                    .join('');
+            }
+
+            // Render Token Transaction Log
+            tokenTransactionLog.innerHTML = appState.transactions
+                .map(
+                    (tx) => `
+                    <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-950/85 border border-sky-400/20">
+                        <div class="min-w-0">
+                            <div class="text-slate-200 truncate">${tx.label}</div>
+                            <div class="text-[11px] text-slate-500">${tx.time}</div>
+                        </div>
+                        <span class="${tx.positive ? 'text-sky-400' : 'text-amber-300'} font-bold shrink-0">${tx.amount}</span>
+                    </div>`
+                )
+                .join('');
+        }
+
+        function switchNavigationTab(tabKey) {
+            const tabMap = {
+                tap: document.getElementById('tab-tap'),
+                referral: document.getElementById('tab-referral'),
+                wallet: document.getElementById('tab-wallet'),
+            };
+
+            Object.entries(tabMap).forEach(([key, section]) => {
+                if (!section) return;
+                section.classList.toggle('hidden', key !== tabKey);
+            });
+
+            document.querySelectorAll('.apv-nav-btn').forEach((btn) => {
+                const isActive = btn.dataset.nav === tabKey;
+                btn.classList.toggle('nav-btn-active', isActive);
+                btn.classList.toggle('nav-btn-inactive', !isActive);
+            });
+        }
+
+        function spawnCircularTenBadge(clientX, clientY) {
+            const rect = tapArena.getBoundingClientRect();
+            const offsetX = clientX ? clientX - rect.left : rect.width / 2;
+            const offsetY = clientY ? clientY - rect.top : rect.height / 2;
+
+            const badge = document.createElement('div');
+            badge.className =
+                'floating-circular-ten w-11 h-11 rounded-full bg-gradient-to-b from-sky-300 to-blue-600 border-2 border-white text-slate-950 font-orbitron text-sm font-black flex items-center justify-center shadow-[0_0_22px_rgba(56,189,248,0.95)]';
+            badge.style.left = `${offsetX}px`;
+            badge.style.top = `${offsetY}px`;
+            badge.textContent = '10';
+
+            tapArena.appendChild(badge);
+            setTimeout(() => badge.remove(), 860);
+        }
+
+        function handleCircularTap(event) {
+            appState.balance += TAP_TOKEN_REWARD;
+            appState.totalTaps += 1;
+
+            // Trigger Telegram Mini App native light haptic feedback when available
+            try {
+                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                    window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                }
+            } catch (e) {
+                // Graceful fallback in standard browsers
+            }
+
+            circularTapRingBtn.classList.remove('tap-ring-press');
+            void circularTapRingBtn.offsetWidth;
+            circularTapRingBtn.classList.add('tap-ring-press');
+
+            const ptX = event && typeof event.clientX === 'number' ? event.clientX : null;
+            const ptY = event && typeof event.clientY === 'number' ? event.clientY : null;
+            spawnCircularTenBadge(ptX, ptY);
+
+            if (appState.totalTaps % 10 === 0) {
+                recordTransaction(`10-Tap Milestone (${appState.totalTaps} taps)`, '+10 $APV', true);
+            }
+
+            saveStateToStorage();
+            renderDashboard();
+        }
+
+        /* =====================================================================
+           STATIC LOADER SUBSYSTEMS & CYAN WAVE ENGINE (1% -> 100%)
+           ===================================================================== */
+        function updateLoaderSubsystems(pct) {
+            if (pct >= 1) {
+                subsysContracts.className = 'flex items-center gap-1.5 text-cyan-200';
+                dotContracts.className = 'w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] shrink-0';
+            }
+            if (pct >= 38) {
+                subsysLiquidity.className = 'flex items-center gap-1.5 text-cyan-200';
+                dotLiquidity.className = 'w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] shrink-0';
+            } else {
+                subsysLiquidity.className = 'flex items-center gap-1.5 text-cyan-300/55';
+                dotLiquidity.className = 'w-1.5 h-1.5 rounded-full bg-cyan-500/40 shrink-0';
+            }
+            if (pct >= 72) {
+                subsysNetwork.className = 'flex items-center gap-1.5 text-cyan-200';
+                dotNetwork.className = 'w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] shrink-0';
+            } else {
+                subsysNetwork.className = 'flex items-center gap-1.5 text-cyan-300/55';
+                dotNetwork.className = 'w-1.5 h-1.5 rounded-full bg-cyan-500/40 shrink-0';
+            }
+        }
+
+        function resizeCyanCanvas() {
+            if (!cyanWaveCanvas) return;
+            cyanWaveCanvas.width = window.innerWidth;
+            cyanWaveCanvas.height = window.innerHeight;
+        }
+
+        function renderLowerWave() {
+            if (!cyanWaveCanvas || loadingOverlay.classList.contains('hidden')) return;
+            const ctx = cyanWaveCanvas.getContext('2d');
+            const w = cyanWaveCanvas.width;
+            const h = cyanWaveCanvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            const anchorY = h * 0.84;
+            wavePhase += 0.045;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(0, anchorY);
+            for (let x = 0; x <= w; x += 12) {
+                const y =
+                    anchorY +
+                    Math.sin(x * 0.012 + wavePhase) * 7 +
+                    Math.cos(x * 0.025 - wavePhase * 1.3) * 4;
+                ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = 'rgba(34, 211, 238, 0.34)';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#00d2ff';
+            ctx.shadowBlur = 14;
+            ctx.stroke();
+            ctx.restore();
+
+            waveAnimId = requestAnimationFrame(renderLowerWave);
+        }
+
+        function completeLoadingTransition() {
+            clearInterval(loaderIntervalId);
+            cancelAnimationFrame(waveAnimId);
+
+            loadingOverlay.classList.add('hidden');
+            document.body.classList.remove('loader-active');
+            miniAppContainer.classList.remove('hidden');
+            switchNavigationTab('tap');
+            renderDashboard();
+        }
+
+        function startStaticLoader() {
+            clearInterval(loaderIntervalId);
+            cancelAnimationFrame(waveAnimId);
+
+            loaderProgress = 1;
+            loaderPercentText.textContent = '1%';
+            loaderBarFill.style.width = '1%';
+            updateLoaderSubsystems(1);
+
+            document.body.classList.add('loader-active');
+            miniAppContainer.classList.add('hidden');
+            loadingOverlay.classList.remove('hidden');
+
+            resizeCyanCanvas();
+            renderLowerWave();
+
+            loaderIntervalId = setInterval(() => {
+                loaderProgress += 1;
+                if (loaderProgress > 100) loaderProgress = 100;
+
+                loaderPercentText.textContent = `${loaderProgress}%`;
+                loaderBarFill.style.width = `${loaderProgress}%`;
+                updateLoaderSubsystems(loaderProgress);
+
+                if (loaderProgress >= 100) {
+                    clearInterval(loaderIntervalId);
+                    setTimeout(completeLoadingTransition, 260);
+                }
+            }, 34);
+        }
+
+        /* =====================================================================
+           EVENT LISTENERS
+           ===================================================================== */
+        circularTapRingBtn.addEventListener('click', handleCircularTap);
+
+        document.querySelectorAll('.apv-nav-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                switchNavigationTab(btn.dataset.nav);
+            });
+        });
+
+        replayLoaderAction.addEventListener('click', startStaticLoader);
+
+        buyCoreUpgradeBtn.addEventListener('click', () => {
+            if (appState.balance < 100) {
+                showToast('Need 100 $APV tokens for Prime Core Boost');
+                return;
+            }
+            appState.balance -= 100;
+            appState.coreLevel += 1;
+            appState.balance += 15;
+            recordTransaction(`Prime Core Boost Lv.${appState.coreLevel}`, '-100 / +15 $APV', true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast(`Upgraded to Lv.${appState.coreLevel} (+15 $APV bonus)!`);
+        });
+
+        claimQuestBtn.addEventListener('click', () => {
+            if (appState.dailyQuestClaimed) {
+                showToast('Daily +25 $APV quest already claimed');
+                return;
+            }
+            appState.dailyQuestClaimed = true;
+            appState.balance += 25;
+            recordTransaction('Daily Prime Check-In Quest', '+25 $APV', true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast('Claimed +25 $APV tokens!');
+        });
+
+        copyInviteBtn.addEventListener('click', () => {
+            inviteLinkField.select();
+            inviteLinkField.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                showToast('Invite link copied!');
+            } catch (err) {
+                showToast('Invite link ready to share');
+            }
+        });
+
+        recordReferralBtn.addEventListener('click', () => {
+            appState.referrals += 1;
+            appState.referralBonus += REFERRAL_TOKEN_REWARD;
+            appState.balance += REFERRAL_TOKEN_REWARD;
+
+            appState.referralHistory.unshift({
+                friendLabel: `Prime Friend #${appState.referrals}`,
+                reward: REFERRAL_TOKEN_REWARD,
+                time: formatNowTime(),
+            });
+            if (appState.referralHistory.length > 15) {
+                appState.referralHistory.length = 15;
+            }
+
+            recordTransaction(`Friend Referral #${appState.referrals}`, `+${REFERRAL_TOKEN_REWARD} $APV`, true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast(`+${REFERRAL_TOKEN_REWARD} $APV referral reward credited!`);
+        });
+
+        claimTokensBtn.addEventListener('click', () => {
+            appState.balance += 50;
+            recordTransaction('Wallet Token Claim', '+50 $APV', true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast('Claimed +50 $APV tokens!');
+        });
+
+        transferTokensBtn.addEventListener('click', () => {
+            if (appState.balance < 10) {
+                showToast('Need at least 10 $APV tokens to transfer');
+                return;
+            }
+            appState.balance -= 10;
+            recordTransaction('Wallet On-Chain Transfer', '-10 $APV', false);
+            saveStateToStorage();
+            renderDashboard();
+            showToast('Transferred 10 $APV tokens');
+        });
+
+        window.addEventListener('resize', resizeCyanCanvas);
+
+        window.onload = function () {
+            // Initialize Telegram WebApp SDK if running inside Telegram
+            try {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+            } catch (e) {
+                // Graceful fallback outside Telegram
+            }
+
+            loadStateFromStorage();
+            renderDashboard();
+            startStaticLoader();
+        };
+    </script>
+</body>
+</html>
+```

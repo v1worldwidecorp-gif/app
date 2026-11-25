@@ -1,0 +1,2234 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>APEXVERSE PRIME ($APV) — Telegram Mini App</title>
+    <!-- Telegram WebApp SDK for viewport expansion and haptic feedback -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Tailwind CSS for responsive mobile-first layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter, Orbitron, and JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet"
+    />
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        orbitron: ['Orbitron', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        /* Strict 100dvh viewport lock: prevents scrolling, overscroll bounce, and zoom */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100dvh;
+            background-color: #020611;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            overscroll-behavior: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Applied after loading finishes to lock pinch and double-tap zoom */
+        body.app-zoom-locked,
+        body.app-zoom-locked * {
+            touch-action: none !important;
+            -webkit-touch-callout: none !important;
+        }
+
+        /* Full-screen static loading overlay (0% -> 100% Analyzing) */
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100dvh;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% 24%, #0b2957 0%, #05132b 52%, #020611 100%);
+            transform: none !important;
+            animation: none !important;
+            z-index: 9999;
+        }
+
+        /* Full-screen scene artwork container (no circular crop around lion) */
+        .loader-scene-stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 14px 128px;
+            box-sizing: border-box;
+        }
+
+        .loader-hero-artwork {
+            width: min(92vw, 540px);
+            max-height: 52dvh;
+            object-fit: contain;
+            object-position: center;
+            filter: drop-shadow(0 0 24px rgba(34, 211, 238, 0.45));
+            transform: none !important;
+            animation: none !important;
+            pointer-events: none;
+        }
+
+        .loader-console-panel {
+            background: linear-gradient(155deg, rgba(8, 28, 62, 0.9), rgba(3, 12, 28, 0.95));
+            border: 1.5px solid rgba(56, 189, 248, 0.72);
+            box-shadow: 0 0 24px rgba(0, 210, 255, 0.34), inset 0 0 14px rgba(125, 211, 252, 0.16);
+        }
+
+        /* Segmented glowing blue fill bar */
+        .segmented-blue-bar {
+            background-image:
+                repeating-linear-gradient(
+                    -55deg,
+                    rgba(255, 255, 255, 0.35) 0px,
+                    rgba(255, 255, 255, 0.35) 6px,
+                    rgba(2, 132, 199, 0.25) 6px,
+                    rgba(2, 132, 199, 0.25) 12px
+                ),
+                linear-gradient(90deg, #0284c7 0%, #00d2ff 58%, #7dd3fc 100%);
+            box-shadow: 0 0 18px rgba(0, 210, 255, 0.85), inset 0 0 8px rgba(255, 255, 255, 0.45);
+            transition: width 85ms linear;
+        }
+
+        .hud-corner {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-color: #38bdf8;
+            pointer-events: none;
+        }
+
+        .apv-grid-bg {
+            background-image:
+                linear-gradient(to right, rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+            background-size: 28px 28px;
+        }
+
+        .apv-card {
+            background: rgba(7, 17, 38, 0.9);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 189, 248, 0.28);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.52);
+        }
+
+        .apv-subcard {
+            background: rgba(3, 10, 24, 0.88);
+            border: 1px solid rgba(56, 189, 248, 0.22);
+        }
+
+        /* Futuristic glowing electric cyan-blue holographic HUD frame buttons */
+        .hud-blue-btn {
+            position: relative;
+            background: linear-gradient(155deg, rgba(14, 165, 233, 0.26), rgba(29, 78, 216, 0.22) 55%, rgba(4, 14, 32, 0.96));
+            border: 1.5px solid rgba(56, 189, 248, 0.78);
+            box-shadow:
+                0 0 15px rgba(56, 189, 248, 0.34),
+                inset 0 0 11px rgba(125, 211, 252, 0.25);
+            transition: transform 0.1s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+
+        .hud-blue-btn::before {
+            content: "";
+            position: absolute;
+            inset: 2px;
+            border-radius: 13px;
+            border: 1px solid rgba(125, 211, 252, 0.24);
+            pointer-events: none;
+        }
+
+        .hud-blue-btn:active {
+            transform: scale(0.95);
+            border-color: #bae6fd;
+            box-shadow:
+                0 0 24px rgba(56, 189, 248, 0.75),
+                inset 0 0 15px rgba(186, 230, 253, 0.38);
+        }
+
+        .hud-guide-highlight {
+            border-color: #bae6fd !important;
+            box-shadow:
+                0 0 22px rgba(56, 189, 248, 0.92),
+                0 0 36px rgba(34, 211, 238, 0.45),
+                inset 0 0 14px rgba(186, 230, 253, 0.42) !important;
+        }
+
+        @keyframes apvGuideBob {
+            0%, 100% { transform: translate(-50%, -100%) translateY(0px) scale(1); }
+            50% { transform: translate(-50%, -100%) translateY(-5px) scale(1.04); }
+        }
+
+        .apv-lion-guide-arrow {
+            position: fixed;
+            z-index: 45;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: apvGuideBob 1.15s ease-in-out infinite;
+            filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.85));
+        }
+
+        .tap-ring-surface {
+            touch-action: manipulation;
+            box-shadow:
+                0 0 0 2px rgba(56, 189, 248, 0.55),
+                0 0 38px rgba(14, 165, 233, 0.48),
+                inset 0 0 28px rgba(0, 210, 255, 0.24);
+        }
+
+        @keyframes tapRingPress {
+            0% { transform: scale(1); }
+            45% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+
+        .tap-ring-press {
+            animation: tapRingPress 0.14s ease-out;
+        }
+
+        @keyframes circularBadgeRise {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, 0) scale(0.85);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -44px) scale(1.06);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -82px) scale(0.95);
+            }
+        }
+
+        .floating-circular-badge {
+            position: absolute;
+            pointer-events: none;
+            z-index: 40;
+            animation: circularBadgeRise 0.82s ease-out forwards;
+        }
+
+        .wallet-blue-banner {
+            background: linear-gradient(95deg, rgba(14, 165, 233, 0.3), rgba(37, 99, 235, 0.28) 55%, rgba(8, 145, 178, 0.25));
+            border: 1.5px solid rgba(125, 211, 252, 0.82);
+            box-shadow: 0 0 18px rgba(56, 189, 248, 0.36), inset 0 0 12px rgba(125, 211, 252, 0.18);
+        }
+
+        @keyframes apvThinkFloat {
+            0%, 100% { transform: translateY(0px) rotate(-1.5deg); }
+            50% { transform: translateY(-3px) rotate(2deg); }
+        }
+
+        .wallet-thinker-anim {
+            animation: apvThinkFloat 2.4s ease-in-out infinite;
+        }
+
+        .wallet-thought-bubble {
+            background: linear-gradient(145deg, rgba(8, 28, 62, 0.95), rgba(4, 14, 34, 0.96));
+            border: 1.5px solid rgba(56, 189, 248, 0.65);
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+        }
+
+        .blue-action-pill {
+            background: linear-gradient(145deg, rgba(14, 165, 233, 0.28), rgba(2, 132, 199, 0.2));
+            border: 1.5px solid rgba(56, 189, 248, 0.72);
+            color: #e0f2fe;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.28), inset 0 0 8px rgba(125, 211, 252, 0.18);
+            transition: transform 0.1s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+
+        .blue-action-pill:hover {
+            border-color: #bae6fd;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.5), inset 0 0 12px rgba(186, 230, 253, 0.26);
+        }
+
+        .blue-action-pill:active {
+            transform: scale(0.96);
+        }
+
+        .blue-primary-cta {
+            background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+            border: 1px solid #bae6fd;
+            color: #020b1c;
+            box-shadow: 0 0 18px rgba(56, 189, 248, 0.55);
+            transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+        }
+
+        .blue-primary-cta:hover {
+            filter: brightness(1.08);
+            box-shadow: 0 0 24px rgba(56, 189, 248, 0.75);
+        }
+
+        .blue-primary-cta:active {
+            transform: scale(0.96);
+        }
+
+        .nav-btn-active {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.34), rgba(0, 210, 255, 0.2));
+            border-color: rgba(56, 189, 248, 0.95) !important;
+            color: #e0f2fe !important;
+            box-shadow: 0 0 16px rgba(56, 189, 248, 0.38);
+        }
+
+        .nav-btn-inactive {
+            background: rgba(15, 23, 42, 0.8);
+            border-color: rgba(56, 189, 248, 0.28);
+            color: #93c5fd;
+        }
+    </style>
+</head>
+<body class="bg-[#020611] text-slate-100">
+    <!-- =====================================================================
+         1. FULL-SCREEN LOADING OVERLAY (0% -> 100% ANALYZING, 100vw x 100dvh)
+         ===================================================================== -->
+    <div id="loadingOverlay" aria-label="APEXVERSE PRIME Loading Screen">
+        <!-- Futuristic Neon-Blue Mountain Peak Landscape SVG Backdrop -->
+        <svg
+            class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            viewBox="0 0 1200 900"
+            preserveAspectRatio="xMidYMid slice"
+            aria-hidden="true"
+        >
+            <defs>
+                <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#030c1f" />
+                    <stop offset="55%" stop-color="#071d42" />
+                    <stop offset="100%" stop-color="#041026" />
+                </linearGradient>
+                <linearGradient id="farPeakGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#0e3a78" stop-opacity="0.75" />
+                    <stop offset="100%" stop-color="#041024" stop-opacity="0.95" />
+                </linearGradient>
+                <linearGradient id="nearPeakGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#082856" stop-opacity="0.9" />
+                    <stop offset="100%" stop-color="#020814" stop-opacity="1" />
+                </linearGradient>
+            </defs>
+            <rect width="1200" height="900" fill="url(#skyGrad)" />
+            <!-- Horizon glow -->
+            <ellipse cx="600" cy="540" rx="560" ry="110" fill="rgba(0, 210, 255, 0.14)" />
+            <!-- Distant neon mountain range -->
+            <polygon points="0,580 190,340 380,520 600,265 810,490 1020,315 1200,530 1200,900 0,900" fill="url(#farPeakGrad)" />
+            <polyline points="0,580 190,340 380,520 600,265 810,490 1020,315 1200,530" fill="none" stroke="#38bdf8" stroke-opacity="0.55" stroke-width="2.5" />
+            <!-- Foreground prime peak range -->
+            <polygon points="0,670 250,430 490,610 740,375 985,575 1200,410 1200,900 0,900" fill="url(#nearPeakGrad)" />
+            <polyline points="0,670 250,430 490,610 740,375 985,575 1200,410" fill="none" stroke="#22d3ee" stroke-opacity="0.82" stroke-width="3" />
+        </svg>
+
+        <!-- Vignette Overlay -->
+        <div
+            class="absolute inset-0 pointer-events-none"
+            style="background: radial-gradient(circle at 50% 42%, rgba(2, 10, 26, 0.06) 0%, rgba(2, 6, 17, 0.48) 72%, rgba(2, 6, 17, 0.88) 100%);"
+        ></div>
+
+        <!-- Lower Cyan Wave Canvas -->
+        <canvas id="cyanWaveCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+
+        <!-- Full-Screen Scene: Cute Baby Lion with Sci-Fi Gun + Computer Display ("APEXVERSE PRIME") -->
+        <div class="loader-scene-stage z-10 pointer-events-none">
+            <div class="flex flex-col items-center text-center">
+                <h1 class="font-orbitron text-lg sm:text-2xl font-black tracking-widest text-white uppercase drop-shadow-[0_0_16px_rgba(56,189,248,0.85)]">
+                    APEXVERSE PRIME
+                </h1>
+                <div class="mt-0.5 font-orbitron text-[11px] sm:text-xs font-extrabold tracking-widest text-cyan-300">
+                    APEXVERSE PRIME ($APV)
+                </div>
+            </div>
+
+            <!-- Uncropped Full Character Artwork (Lion + Gun fully framed) -->
+            <div class="w-full flex-1 min-h-0 flex items-center justify-center my-1">
+                <img
+                    src="https://i.ibb.co/5hKGb3cV/1795339027751.png"
+                    alt="APEXVERSE PRIME Cute Baby Lion with Sci-Fi Gun"
+                    class="loader-hero-artwork"
+                    onerror="this.onerror=null; this.src='https://placehold.co/640x420/041229/38bdf8?text=APEXVERSE+PRIME+LION+%26+GUN';"
+                />
+            </div>
+
+            <!-- Futuristic Computer Terminal Displaying APEXVERSE PRIME -->
+            <div class="loader-console-panel w-full max-w-md rounded-2xl px-3.5 py-2 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-cyan-300 shadow-[0_0_10px_#22d3ee] shrink-0"></span>
+                    <div class="min-w-0">
+                        <div class="font-mono text-[9px] uppercase tracking-wider text-cyan-300/80">
+                            APEX COMPUTER TERMINAL
+                        </div>
+                        <div class="font-orbitron text-xs sm:text-sm font-black tracking-wider text-white truncate">
+                            APEXVERSE PRIME
+                        </div>
+                    </div>
+                </div>
+                <span class="px-2 py-0.5 rounded bg-sky-500/20 border border-sky-300/60 font-mono text-[10px] font-bold text-cyan-200 shrink-0">
+                    0%–100% ANALYZING
+                </span>
+            </div>
+        </div>
+
+        <!-- Progress Bar & Subsystem Statuses -->
+        <div class="absolute inset-x-0 bottom-5 sm:bottom-8 px-4 flex flex-col items-center pointer-events-none z-10">
+            <div class="w-full max-w-2xl rounded-2xl bg-[#030b1c]/88 backdrop-blur-md border border-cyan-400/35 px-4 sm:px-6 py-3.5 shadow-[0_0_32px_rgba(0,180,255,0.28)]">
+                <div class="flex items-center justify-between gap-3 mb-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_#22d3ee] shrink-0"></span>
+                        <span class="font-orbitron text-xs sm:text-sm font-extrabold tracking-wider text-cyan-200 uppercase truncate">
+                            APEXVERSE PRIME ($APV) ANALYZING
+                        </span>
+                    </div>
+                    <span
+                        id="loaderPercentText"
+                        class="font-orbitron text-xl sm:text-2xl font-black tracking-wider text-sky-400 drop-shadow-[0_0_14px_rgba(56,189,248,0.85)] shrink-0"
+                    >
+                        0%
+                    </span>
+                </div>
+
+                <!-- Segmented Glowing Blue Bar -->
+                <div class="relative w-full h-4 sm:h-5 rounded-md bg-slate-950/90 border border-cyan-400/45 p-0.5 overflow-hidden">
+                    <span class="hud-corner top-0 left-0 border-t-2 border-l-2"></span>
+                    <span class="hud-corner top-0 right-0 border-t-2 border-r-2"></span>
+                    <span class="hud-corner bottom-0 left-0 border-b-2 border-l-2"></span>
+                    <span class="hud-corner bottom-0 right-0 border-b-2 border-r-2"></span>
+                    <div id="loaderBarFill" class="h-full rounded-sm segmented-blue-bar" style="width: 0%;"></div>
+                </div>
+
+                <!-- Subsystem Initialization Lines -->
+                <div class="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2 font-mono text-[10px] sm:text-[11px] tracking-wide">
+                    <div id="subsysContracts" class="flex items-center gap-1.5 text-cyan-200">
+                        <span id="dotContracts" class="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"></span>
+                        <span class="truncate">SMART CONTRACTS: READY</span>
+                    </div>
+                    <div id="subsysLiquidity" class="flex items-center gap-1.5 text-cyan-300/55">
+                        <span id="dotLiquidity" class="w-1.5 h-1.5 rounded-full bg-cyan-500/40 shrink-0"></span>
+                        <span class="truncate">LIQUIDITY PROVISIONING...</span>
+                    </div>
+                    <div id="subsysNetwork" class="flex items-center gap-1.5 text-cyan-300/55">
+                        <span id="dotNetwork" class="w-1.5 h-1.5 rounded-full bg-cyan-500/40 shrink-0"></span>
+                        <span class="truncate">BLOCKCHAIN NETWORK SYNC...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         GUIDED ONBOARDING: ELECTRIC-BLUE ARROW TOPPED WITH BABY LION
+         ===================================================================== -->
+    <div id="profileGuidedArrow" class="apv-lion-guide-arrow hidden" aria-hidden="true">
+        <div class="w-10 h-10 rounded-full border-2 border-sky-300 bg-[#051226] overflow-hidden shadow-[0_0_14px_rgba(56,189,248,0.85)]">
+            <img
+                src="https://i.ibb.co/C3CXhm2M/1795408867326.png"
+                alt="Guided Lion Pointer"
+                class="w-full h-full object-cover object-center"
+                onerror="this.onerror=null; this.src='https://placehold.co/80x80/051226/38bdf8?text=APV';"
+            />
+        </div>
+        <div class="mt-0.5 px-1.5 py-0.5 rounded bg-sky-400 text-slate-950 font-orbitron text-[8px] font-black tracking-wider">
+            PROFILE
+        </div>
+        <svg class="w-5 h-5 -mt-0.5 text-sky-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 21L3 11h6V3h6v8h6l-9 10z" />
+        </svg>
+    </div>
+
+    <!-- =====================================================================
+         2. MAIN TELEGRAM MINI-APP DASHBOARD (STRICT 100dvh, NO PAGE SCROLL)
+         ===================================================================== -->
+    <div id="miniAppContainer" class="hidden h-[100dvh] w-full apv-grid-bg relative flex flex-col justify-between overflow-hidden">
+        <div class="fixed -top-28 left-1/2 -translate-x-1/2 w-[520px] h-[260px] bg-sky-500/15 rounded-full blur-[120px] pointer-events-none"></div>
+        <div class="fixed bottom-16 right-0 w-[340px] h-[220px] bg-cyan-500/10 rounded-full blur-[110px] pointer-events-none"></div>
+
+        <div class="relative z-10 w-full max-w-2xl mx-auto px-3 sm:px-5 pt-2 pb-2 flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden">
+            <!-- TOP HEADER BAR -->
+            <header class="apv-card rounded-2xl px-2.5 sm:px-3.5 py-1.5 flex items-center justify-between gap-2 shrink-0">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full p-0.5 bg-gradient-to-tr from-sky-500 via-cyan-300 to-blue-600 shadow-[0_0_16px_rgba(56,189,248,0.65)] shrink-0 overflow-hidden">
+                        <div class="w-full h-full rounded-full bg-[#06101e] overflow-hidden flex items-center justify-center">
+                            <img
+                                src="https://i.ibb.co/PnZZhH6/1795408326087.png"
+                                alt="APEXVERSE PRIME Official Logo"
+                                class="w-full h-full object-cover object-center scale-110 rounded-full"
+                                onerror="this.onerror=null; this.src='https://placehold.co/200x200/06101e/38bdf8?text=APV';"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                            <h2 class="font-orbitron text-[11px] sm:text-xs font-black tracking-wider text-white truncate">
+                                APEXVERSE PRIME
+                            </h2>
+                            <span class="px-1.5 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/50 font-orbitron text-[8px] font-extrabold text-sky-300 shrink-0">
+                                $APV
+                            </span>
+                        </div>
+                        <div id="rankBadgeText" class="font-mono text-[9px] text-cyan-300 truncate">
+                            Bronze Cub
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button
+                        id="soundToggleBtn"
+                        type="button"
+                        aria-label="Toggle tap sound"
+                        class="apv-subcard rounded-xl px-2 py-1 font-mono text-[9px] font-bold text-sky-300 hover:border-sky-400/70 transition cursor-pointer"
+                    >
+                        SFX: ON
+                    </button>
+                    <div class="apv-subcard rounded-xl px-2 py-1 text-right">
+                        <div class="text-[8px] uppercase tracking-wider text-slate-400">Profit/Hr</div>
+                        <div class="font-orbitron text-[10px] sm:text-xs font-black text-emerald-300">
+                            +<span id="headerPphValue">0</span>
+                        </div>
+                    </div>
+                    <div class="apv-subcard rounded-xl px-2 sm:px-2.5 py-1 text-right">
+                        <div class="text-[8px] uppercase tracking-wider text-slate-400">$APV</div>
+                        <div class="font-orbitron text-[11px] sm:text-xs font-black text-sky-300">
+                            <span id="headerBalanceValue">0</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- TAB 1: EARN VIEW -->
+            <section id="tab-earn" aria-label="Earn View" class="flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden">
+                <!-- Post-Profile App & April-October 2027 Coin Launch Introduction Callout -->
+                <div id="appIntroBanner" class="hidden apv-subcard rounded-2xl px-3 py-1.5 border-sky-300/75 bg-sky-950/65 flex items-center justify-between gap-2 shrink-0">
+                    <p class="text-[10px] text-cyan-100 leading-tight">
+                        <span class="font-orbitron font-bold text-sky-300">APEXVERSE PRIME ($APV):</span>
+                        This coin will launch between <span class="font-bold text-emerald-300">April and October 2027</span> (next year 2027).
+                    </p>
+                    <button
+                        id="dismissAppIntroBtn"
+                        type="button"
+                        class="px-2 py-0.5 rounded-lg bg-sky-500/25 border border-sky-300/50 font-mono text-[9px] font-bold text-white cursor-pointer shrink-0"
+                    >
+                        OK
+                    </button>
+                </div>
+
+                <!-- Earned Tokens + Energy Bar -->
+                <div class="apv-card rounded-2xl px-3 py-1.5 flex items-center justify-between gap-3 shrink-0">
+                    <div class="min-w-0">
+                        <div class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Earned Tokens</div>
+                        <div class="font-orbitron text-sm sm:text-base font-black text-white truncate">
+                            <span id="tapBalanceValue">0</span>
+                            <span class="text-[10px] font-bold text-sky-400 ml-1">$APV</span>
+                            <span class="text-[9px] font-mono text-emerald-300 ml-2">VAULT: <span id="vaultStatValue">0</span></span>
+                        </div>
+                    </div>
+
+                    <div class="w-32 sm:w-44 shrink-0">
+                        <div class="flex items-center justify-between font-mono text-[9px] text-sky-300 mb-0.5">
+                            <span>ENERGY</span>
+                            <span id="energyText">1000 / 1000</span>
+                        </div>
+                        <div class="w-full h-1.5 rounded-full bg-slate-950 border border-sky-400/35 overflow-hidden">
+                            <div id="energyBarFill" class="h-full bg-gradient-to-r from-sky-500 to-cyan-300 transition-all duration-150" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Tap Arena: Left (Profile, Boost), Center Tap Ring, Right (My Code, Task) -->
+                <div class="apv-card rounded-2xl p-2 sm:p-3 flex flex-col items-center justify-between gap-1.5 shrink-0 overflow-hidden">
+                    <div class="w-full flex items-center justify-between gap-1.5 sm:gap-2.5 min-w-0">
+                        <!-- Left Electric-Blue Side Controls: Profile & Boost -->
+                        <div class="flex flex-col gap-1.5 shrink-0">
+                            <button
+                                id="openProfileBtn"
+                                type="button"
+                                class="hud-blue-btn w-16 sm:w-20 py-2 px-1 rounded-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-pointer"
+                            >
+                                <span class="font-orbitron text-[9px] sm:text-[10px] font-extrabold text-cyan-100 tracking-wider">Profile</span>
+                                <span id="sideProfileStatus" class="font-mono text-[8px] text-cyan-200">+1,000</span>
+                            </button>
+
+                            <button
+                                id="openBoostModalBtn"
+                                type="button"
+                                class="hud-blue-btn w-16 sm:w-20 py-2 px-1 rounded-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-pointer"
+                            >
+                                <span class="font-orbitron text-[9px] sm:text-[10px] font-extrabold text-cyan-100 tracking-wider">Boost</span>
+                                <span id="sideBoostLv" class="font-mono text-[8px] text-cyan-200">Lv.1</span>
+                            </button>
+                        </div>
+
+                        <!-- Center Circular Tap Ring -->
+                        <div id="tapArena" class="relative flex items-center justify-center flex-1 min-w-0 min-h-0 py-0.5 overflow-hidden">
+                            <button
+                                id="circularTapRingBtn"
+                                type="button"
+                                aria-label="Tap circular button to earn $APV Tokens"
+                                class="w-32 h-32 sm:w-40 sm:h-40 aspect-square rounded-full border-2 border-sky-300/85 bg-[#06101e] tap-ring-surface flex items-center justify-center transition-transform cursor-pointer focus:outline-none relative overflow-hidden p-0"
+                            >
+                                <img
+                                    src="https://i.ibb.co/C3CXhm2M/1795408867326.png"
+                                    alt="APEXVERSE PRIME Tap Button"
+                                    class="w-full h-full object-cover object-center rounded-full pointer-events-none select-none"
+                                    onerror="this.onerror=null; this.src='https://placehold.co/400x400/06101e/38bdf8?text=TAP+%24APV';"
+                                />
+                                <div
+                                    class="absolute inset-0 rounded-full pointer-events-none"
+                                    style="box-shadow: inset 0 0 20px rgba(2, 6, 17, 0.72);"
+                                ></div>
+                            </button>
+                        </div>
+
+                        <!-- Right Electric-Blue Side Controls: My Code & Task -->
+                        <div class="flex flex-col gap-1.5 shrink-0">
+                            <button
+                                id="openMyCodeBtn"
+                                type="button"
+                                class="hud-blue-btn w-16 sm:w-20 py-2 px-1 rounded-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-pointer"
+                            >
+                                <span class="font-orbitron text-[9px] sm:text-[10px] font-extrabold text-cyan-100 tracking-wider">My Code</span>
+                                <span class="font-mono text-[8px] text-cyan-200">APEX100</span>
+                            </button>
+
+                            <button
+                                id="openQuestModalBtn"
+                                type="button"
+                                class="hud-blue-btn w-16 sm:w-20 py-2 px-1 rounded-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-pointer"
+                            >
+                                <span class="font-orbitron text-[9px] sm:text-[10px] font-extrabold text-cyan-100 tracking-wider">Task</span>
+                                <span id="sideQuestStatus" class="font-mono text-[8px] text-emerald-300">Ready</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Tap Rate Pill -->
+                    <div class="px-4 py-1 rounded-xl bg-sky-950/75 border border-sky-400/60 flex items-center gap-2 shrink-0">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+                        <span id="bottomTapRateValue" class="font-orbitron text-sm sm:text-base font-black text-sky-400">+10</span>
+                        <span class="font-mono text-[10px] font-bold uppercase tracking-wider text-sky-300">$APV / Tap</span>
+                    </div>
+                </div>
+
+                <!-- Compact 10-Candle $APV / USDT Trading Mini-Game Chart + BUY / SELL / VAULT -->
+                <div aria-label="APV Trading Mini-Game" class="apv-card rounded-2xl p-2 flex-1 min-h-0 flex flex-col justify-between gap-1.5 overflow-hidden">
+                    <div class="flex items-center justify-between gap-2 shrink-0">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="font-orbitron text-[10px] font-extrabold text-white">$APV / USDT</span>
+                            <span id="livePriceText" class="font-mono text-xs font-bold text-emerald-300">$0.0100</span>
+                            <span id="priceChangeBadge" class="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">+0.0%</span>
+                        </div>
+                        <div class="font-mono text-[9px] text-sky-200">
+                            HELD: <strong id="heldApvText" class="text-white">0</strong>
+                        </div>
+                    </div>
+
+                    <div class="relative flex-1 min-h-0 w-full rounded-xl bg-slate-950/90 border border-sky-400/25 overflow-hidden">
+                        <canvas id="apvChartCanvas" class="w-full h-full block"></canvas>
+
+                        <!-- Leaping Baby Lion Marker at Leading Edge -->
+                        <div
+                            id="lionChartTipMarker"
+                            class="pointer-events-none absolute z-10 w-7 h-7 rounded-full border-2 border-cyan-200 bg-[#05152c] overflow-hidden shadow-[0_0_12px_rgba(34,211,238,0.85)] transition-all duration-200"
+                            style="right: 8%; top: 35%; transform: translate(-50%, -50%);"
+                        >
+                            <img
+                                src="https://i.ibb.co/C3CXhm2M/1795408867326.png"
+                                alt="Leaping Lion Chart Marker"
+                                class="w-full h-full object-cover object-center"
+                                onerror="this.onerror=null; this.src='https://placehold.co/64x64/05152c/38bdf8?text=APV';"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-[1fr_auto_auto_auto] items-center gap-1.5 shrink-0">
+                        <input
+                            id="tradeAmountInput"
+                            type="number"
+                            min="1"
+                            step="1"
+                            value="50"
+                            aria-label="Trade $APV Amount"
+                            class="w-full px-2 py-1 rounded-xl bg-slate-950 border border-sky-400/35 font-mono text-xs text-white focus:outline-none focus:border-sky-300"
+                        />
+                        <button
+                            id="buyApvBtn"
+                            type="button"
+                            class="px-2.5 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/60 font-orbitron text-[9px] font-extrabold text-emerald-200 cursor-pointer"
+                        >
+                            BUY
+                        </button>
+                        <button
+                            id="sellApvBtn"
+                            type="button"
+                            class="px-2.5 py-1 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/60 font-orbitron text-[9px] font-extrabold text-rose-200 cursor-pointer"
+                        >
+                            SELL
+                        </button>
+                        <button
+                            id="lockVaultBtn"
+                            type="button"
+                            class="px-2.5 py-1 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/60 font-orbitron text-[9px] font-extrabold text-sky-200 cursor-pointer"
+                        >
+                            VAULT
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: REFERRAL VIEW (SINGLE BOUNDED BOX) -->
+            <section id="tab-referral" aria-label="Referral View" class="hidden flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div class="apv-card rounded-3xl p-3 sm:p-4 flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden">
+                    <div class="shrink-0">
+                        <h2 class="font-orbitron text-sm sm:text-base font-extrabold text-sky-200 tracking-wider">
+                            REFERRAL HUB ($APV)
+                        </h2>
+                        <p class="text-[11px] text-sky-200/75 mt-0.5 leading-snug">
+                            Earn +100 $APV for every friend who joins with your invite link.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 shrink-0">
+                        <div class="apv-subcard rounded-2xl p-2.5 border-sky-400/35 overflow-hidden">
+                            <div class="text-[9px] uppercase tracking-wider text-sky-300/80">Friends</div>
+                            <div id="referralCountText" class="font-orbitron text-base sm:text-lg font-black text-sky-100 mt-0.5 truncate">0</div>
+                        </div>
+                        <div class="apv-subcard rounded-2xl p-2.5 border-sky-400/35 overflow-hidden">
+                            <div class="text-[9px] uppercase tracking-wider text-sky-300/80">Referral Bonus</div>
+                            <div id="referralBonusText" class="font-orbitron text-base sm:text-lg font-black text-sky-300 mt-0.5 truncate">0 $APV</div>
+                        </div>
+                    </div>
+
+                    <div class="apv-subcard rounded-2xl p-2.5 space-y-1.5 shrink-0 border-sky-400/35 overflow-hidden">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-[9px] font-semibold uppercase tracking-wider text-sky-300">
+                                Invite Link
+                            </span>
+                            <button
+                                id="copyInviteBtn"
+                                type="button"
+                                class="blue-primary-cta px-3 py-1 rounded-xl font-orbitron text-[10px] font-extrabold cursor-pointer shrink-0"
+                            >
+                                Copy
+                            </button>
+                        </div>
+                        <div
+                            id="inviteLinkBox"
+                            class="w-full px-2.5 py-1.5 rounded-xl bg-slate-950 border border-sky-400/45 font-mono text-[10px] text-sky-200 break-all leading-snug select-all"
+                        >https://t.me/ApexversePrimeBot?start=APV_INVITE</div>
+                    </div>
+
+                    <div class="apv-subcard rounded-2xl p-2.5 flex items-center justify-between gap-2 shrink-0 border-sky-400/35 overflow-hidden">
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-sky-100 truncate">Invite Reward</div>
+                            <div class="text-[10px] text-sky-300/80 truncate">+100 $APV per friend</div>
+                        </div>
+                        <button
+                            id="recordReferralBtn"
+                            type="button"
+                            class="blue-action-pill px-3 py-1.5 rounded-xl font-orbitron text-[10px] font-extrabold cursor-pointer shrink-0"
+                        >
+                            +100 $APV
+                        </button>
+                    </div>
+
+                    <div class="apv-subcard rounded-2xl p-2.5 flex-1 min-h-0 flex flex-col overflow-hidden border-sky-400/35">
+                        <div class="text-[9px] font-bold uppercase tracking-wider text-sky-300 mb-1 shrink-0">
+                            Referral List
+                        </div>
+                        <div id="friendRewardHistory" class="space-y-1 text-xs font-mono overflow-y-auto pr-1 flex-1 min-h-0"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: WALLET VIEW -->
+            <section id="tab-wallet" aria-label="Wallet View" class="hidden flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden">
+                <!-- Inline Electric-Blue Launch Banner Above Wallet Card -->
+                <div id="walletLaunchBanner" class="wallet-blue-banner rounded-2xl px-3 py-2 shrink-0 flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-full border border-sky-200 bg-[#041229] overflow-hidden shrink-0">
+                        <img
+                            src="https://i.ibb.co/PnZZhH6/1795408326087.png"
+                            alt="APEXVERSE PRIME Launch Emblem"
+                            class="w-full h-full object-cover object-center"
+                            onerror="this.onerror=null; this.src='https://placehold.co/64x64/041229/38bdf8?text=APV';"
+                        />
+                    </div>
+                    <p class="font-orbitron text-[10px] sm:text-[11px] font-extrabold tracking-wide text-cyan-100 leading-snug">
+                        This token will launch between April and October 2027.
+                    </p>
+                </div>
+
+                <div class="apv-card rounded-3xl p-3.5 flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden">
+                    <!-- Thinking Lion Character & Thought Bubble Box -->
+                    <div class="apv-subcard rounded-2xl p-2 flex items-center gap-2.5 shrink-0 border-sky-400/35">
+                        <div class="w-11 h-11 rounded-2xl border border-sky-400/70 bg-[#051226] overflow-hidden shrink-0 wallet-thinker-anim">
+                            <img
+                                src="https://i.ibb.co/C3CXhm2M/1795408867326.png"
+                                alt="Thinking Lion Character"
+                                class="w-full h-full object-cover object-center"
+                                onerror="this.onerror=null; this.src='https://placehold.co/88x88/051226/38bdf8?text=APV';"
+                            />
+                        </div>
+                        <div class="wallet-thought-bubble rounded-xl px-2.5 py-1.5 flex-1 min-w-0">
+                            <div class="font-mono text-[9px] font-bold uppercase text-sky-300">Thinking About $APV Launch</div>
+                            <div class="text-[10px] text-sky-100 leading-snug">
+                                This token will launch between April and October 2027 (next year 2027).
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2 shrink-0">
+                        <div class="min-w-0">
+                            <div class="text-[10px] uppercase tracking-wider text-sky-300/80">Available Balance</div>
+                            <div class="font-orbitron text-base sm:text-lg font-black text-sky-300 truncate">
+                                <span id="walletBalanceValue">0</span>
+                                <span class="text-xs font-bold text-cyan-200 ml-1">$APV</span>
+                            </div>
+                            <div id="walletAddressBadge" class="font-mono text-[10px] text-sky-200/75 truncate">
+                                TON Wallet: Not Connected
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button
+                                id="connectTonWalletBtn"
+                                type="button"
+                                class="blue-primary-cta px-2.5 py-2 rounded-xl font-orbitron text-[10px] font-extrabold cursor-pointer"
+                            >
+                                Connect TON
+                            </button>
+                            <button
+                                id="claimAirdropBtn"
+                                type="button"
+                                class="blue-action-pill px-2.5 py-2 rounded-xl font-orbitron text-[10px] font-extrabold cursor-pointer"
+                            >
+                                Claim +50
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="apv-subcard rounded-2xl p-2.5 flex-1 min-h-0 flex flex-col overflow-hidden border-sky-400/35">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-sky-300 mb-1 shrink-0">
+                            Transaction Log
+                        </div>
+                        <div id="tokenTransactionLog" class="space-y-1 text-xs font-mono overflow-y-auto pr-1 flex-1 min-h-0"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- BOTTOM NAVIGATION BAR: EARN, REFERRAL, WALLET -->
+            <nav
+                aria-label="Primary Navigation"
+                class="w-full bg-[#030b1c]/95 backdrop-blur-xl border border-sky-400/30 rounded-2xl p-1.5 shrink-0 overflow-hidden"
+            >
+                <div class="grid grid-cols-3 gap-1.5 min-w-0">
+                    <button
+                        type="button"
+                        data-nav="earn"
+                        class="apv-nav-btn min-w-0 py-2 px-1 rounded-xl border font-orbitron text-[10px] sm:text-xs font-bold tracking-tight transition cursor-pointer truncate nav-btn-active"
+                    >
+                        Earn
+                    </button>
+                    <button
+                        type="button"
+                        data-nav="referral"
+                        class="apv-nav-btn min-w-0 py-2 px-1 rounded-xl border font-orbitron text-[10px] sm:text-xs font-bold tracking-tight transition cursor-pointer truncate nav-btn-inactive"
+                    >
+                        Referral
+                    </button>
+                    <button
+                        type="button"
+                        data-nav="wallet"
+                        class="apv-nav-btn min-w-0 py-2 px-1 rounded-xl border font-orbitron text-[10px] sm:text-xs font-bold tracking-tight transition cursor-pointer truncate nav-btn-inactive"
+                    >
+                        Wallet
+                    </button>
+                </div>
+            </nav>
+        </div>
+
+        <!-- PROFILE MODAL (Name, Age, Date of Birth -> +1,000 $APV once + auto-dismiss form + March-April intro) -->
+        <div id="profileModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="apv-card rounded-3xl w-full max-w-md p-4 sm:p-5 space-y-3 max-h-[85dvh] overflow-y-auto">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-orbitron text-base font-extrabold text-white">APEXVERSE PROFILE</h3>
+                    <button type="button" data-close-modal="profileModal" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-300 cursor-pointer">
+                        Close
+                    </button>
+                </div>
+
+                <div id="profileFormCard" class="apv-subcard rounded-2xl p-3.5 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-white">Member Details</span>
+                        <span id="profileBonusBadge" class="font-mono text-[10px] text-emerald-300">+1,000 $APV Bonus</span>
+                    </div>
+
+                    <div>
+                        <label for="profileNameInput" class="block text-[10px] font-mono text-slate-400 mb-1">Name *</label>
+                        <input
+                            id="profileNameInput"
+                            type="text"
+                            placeholder="Enter your name"
+                            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-sky-400/35 text-xs text-white focus:outline-none focus:border-sky-300"
+                        />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label for="profileAgeInput" class="block text-[10px] font-mono text-slate-400 mb-1">Age</label>
+                            <input
+                                id="profileAgeInput"
+                                type="number"
+                                min="5"
+                                max="120"
+                                placeholder="Age"
+                                class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-sky-400/35 font-mono text-xs text-white focus:outline-none focus:border-sky-300"
+                            />
+                        </div>
+                        <div>
+                            <label for="profileDobInput" class="block text-[10px] font-mono text-slate-400 mb-1">Date of Birth</label>
+                            <input
+                                id="profileDobInput"
+                                type="date"
+                                lang="en-US"
+                                aria-label="Date of Birth"
+                                class="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-sky-400/35 font-mono text-[11px] text-white focus:outline-none focus:border-sky-300"
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        id="saveProfileBtn"
+                        type="button"
+                        class="blue-primary-cta w-full py-2.5 rounded-xl font-orbitron text-xs font-extrabold cursor-pointer"
+                    >
+                        Save Profile (+1,000 $APV)
+                    </button>
+                </div>
+
+                <div id="profileSavedCard" class="hidden apv-subcard rounded-2xl p-3.5 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="font-mono text-[10px] font-bold text-emerald-300">PROFILE SAVED</span>
+                        <button
+                            id="editProfileBtn"
+                            type="button"
+                            class="px-2 py-0.5 rounded-lg bg-slate-900 border border-sky-400/35 font-mono text-[10px] text-sky-200 cursor-pointer"
+                        >
+                            Edit
+                        </button>
+                    </div>
+                    <div id="profileSavedName" class="font-orbitron text-sm font-extrabold text-white"></div>
+                    <div id="profileSavedMeta" class="font-mono text-[10px] text-slate-400"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MY CODE MODAL -->
+        <div id="myCodeModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="apv-card rounded-3xl w-full max-w-md p-4 sm:p-5 space-y-3 max-h-[85dvh] overflow-y-auto">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-orbitron text-base font-extrabold text-white">MY CODE</h3>
+                    <button type="button" data-close-modal="myCodeModal" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-300 cursor-pointer">
+                        Close
+                    </button>
+                </div>
+                <p class="text-xs text-slate-300">Enter bonus code <span class="font-mono font-bold text-sky-300">APEX100</span> to claim +100 $APV.</p>
+                <div class="flex gap-2">
+                    <input
+                        id="bonusCodeInput"
+                        type="text"
+                        placeholder="APEX100"
+                        class="flex-1 min-w-0 px-3 py-2 rounded-xl bg-slate-950 border border-sky-400/35 font-mono text-xs text-white uppercase focus:outline-none focus:border-sky-300"
+                    />
+                    <button
+                        id="redeemBonusCodeBtn"
+                        type="button"
+                        class="blue-primary-cta px-3.5 py-2 rounded-xl font-orbitron text-xs font-extrabold cursor-pointer shrink-0"
+                    >
+                        Claim
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOOST MODAL: TAP MULTIPLIER + 3 PPH MINING CARDS -->
+        <div id="boostModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="apv-card rounded-3xl w-full max-w-md p-4 sm:p-5 space-y-3 max-h-[85dvh] overflow-y-auto">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-orbitron text-base font-extrabold text-white">Boost &amp; Mining</h3>
+                    <button type="button" data-close-modal="boostModal" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-300 cursor-pointer">
+                        Close
+                    </button>
+                </div>
+
+                <div class="apv-subcard rounded-2xl p-3 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="text-xs font-bold text-white truncate">Tap Multiplier</div>
+                        <div id="modalBoostLv" class="font-mono text-[10px] text-cyan-300 truncate">Lv. 1 (+10 $APV / tap)</div>
+                    </div>
+                    <button
+                        id="buyCoreUpgradeBtn"
+                        type="button"
+                        class="blue-primary-cta px-3 py-2 rounded-xl font-orbitron text-[10px] font-extrabold cursor-pointer shrink-0"
+                    >
+                        +5 Tap (100)
+                    </button>
+                </div>
+
+                <div class="text-[10px] font-bold uppercase tracking-wider text-sky-300">
+                    Profit / Hr Cards
+                </div>
+                <div id="mineCardsList" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- QUEST MODAL: DAILY CHECK-IN + DAILY COMBO -->
+        <div id="questModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="apv-card rounded-3xl w-full max-w-md p-4 sm:p-5 space-y-3 max-h-[85dvh] overflow-y-auto">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-orbitron text-base font-extrabold text-white">Daily Quests</h3>
+                    <button type="button" data-close-modal="questModal" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-300 cursor-pointer">
+                        Close
+                    </button>
+                </div>
+
+                <div class="apv-subcard rounded-2xl p-3.5 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-white">Daily Check-In</span>
+                        <span class="font-mono text-[10px] text-emerald-300">+25 $APV &amp; Full Energy</span>
+                    </div>
+                    <button
+                        id="claimQuestBtn"
+                        type="button"
+                        class="blue-primary-cta w-full py-2.5 rounded-xl font-orbitron text-xs font-extrabold cursor-pointer"
+                    >
+                        Claim +25 $APV
+                    </button>
+                </div>
+
+                <div class="apv-subcard rounded-2xl p-3.5 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-white">Daily Combo (Pick 3)</span>
+                        <span id="comboCountBadge" class="font-mono text-[10px] text-sky-300">0 / 3 Selected</span>
+                    </div>
+                    <div id="comboCardsGrid" class="grid grid-cols-3 gap-1.5"></div>
+                    <button
+                        id="claimComboBtn"
+                        type="button"
+                        class="blue-primary-cta w-full py-2.5 rounded-xl font-orbitron text-xs font-extrabold cursor-pointer"
+                    >
+                        Claim Combo (+250 $APV)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div
+            id="apvToast"
+            class="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-sky-950/95 border border-sky-400 text-sky-100 text-xs font-semibold shadow-[0_0_20px_rgba(56,189,248,0.5)] opacity-0 pointer-events-none transition-opacity duration-200 whitespace-nowrap"
+        ></div>
+    </div>
+
+    <script>
+        /**
+         * APEXVERSE PRIME ($APV) Telegram Mini App Engine
+         */
+        const TAP_BADGE_IMAGE_URL = "https://i.ibb.co/C3CXhm2M/1795408867326.png";
+        const REFERRAL_LINK_URL = "https://t.me/ApexversePrimeBot?start=APV_INVITE";
+        const REFERRAL_TOKEN_REWARD = 100;
+        const PROFILE_BONUS_REWARD = 1000;
+        const MAX_ENERGY = 1000;
+        const INITIAL_PRICE = 0.0100;
+        const CANDLE_COUNT = 10;
+        const STORAGE_KEY = "apexverse_prime_apv_prime_v1";
+
+        const RANKS = [
+            { min: 0, label: "Bronze Cub" },
+            { min: 500, label: "Silver Cub" },
+            { min: 2000, label: "Gold Lynx" },
+            { min: 6000, label: "Platinum Apex" },
+            { min: 15000, label: "Apex Sovereign" },
+        ];
+
+        const MINE_CARDS = [
+            { id: "node_farm", name: "Prime Node Farm", baseCost: 150, pphGain: 60 },
+            { id: "liq_vault", name: "Liquidity Vault", baseCost: 300, pphGain: 140 },
+            { id: "validator", name: "APEX Validator", baseCost: 600, pphGain: 300 },
+        ];
+
+        const COMBO_CARDS = [
+            { id: "c1", name: "Core Engine" },
+            { id: "c2", name: "TON Bridge" },
+            { id: "c3", name: "Prime Vault" },
+            { id: "c4", name: "Turbo Tap" },
+            { id: "c5", name: "Node Mesh" },
+            { id: "c6", name: "Alpha Key" },
+        ];
+
+        function getTodayKey() {
+            return new Date().toISOString().slice(0, 10);
+        }
+
+        function formatEnglishDate(isoDateStr) {
+            if (!isoDateStr) return "";
+            const parts = isoDateStr.split("-");
+            if (parts.length !== 3) return isoDateStr;
+            const year = Number(parts[0]);
+            const month = Number(parts[1]) - 1;
+            const day = Number(parts[2]);
+            const dt = new Date(Date.UTC(year, month, day));
+            if (Number.isNaN(dt.getTime())) return isoDateStr;
+            return dt.toLocaleDateString("en-US", {
+                month: "short",
+                day: "2-digit",
+                year: "numeric",
+                timeZone: "UTC",
+            });
+        }
+
+        function getCurrentRankLabel(balance) {
+            let current = RANKS[0].label;
+            for (const tier of RANKS) {
+                if (balance >= tier.min) {
+                    current = tier.label;
+                }
+            }
+            return current;
+        }
+
+        const DEFAULT_STATE = {
+            balance: 0,
+            heldApv: 0,
+            vaultLocked: 0,
+            tapPower: 10,
+            coreLevel: 1,
+            energy: MAX_ENERGY,
+            soundEnabled: true,
+            pph: 0,
+            pphFraction: 0,
+            lastTickTime: Date.now(),
+            mineLevels: {
+                node_farm: 0,
+                liq_vault: 0,
+                validator: 0,
+            },
+            dailyQuestClaimed: false,
+            selectedComboIds: [],
+            comboClaimedDate: "",
+            redeemedCodes: [],
+            showAppIntroCard: false,
+            profile: {
+                name: "",
+                age: "",
+                dob: "",
+                bonusAwarded: false,
+                formDismissed: false,
+            },
+            walletConnected: false,
+            walletAddress: "",
+            referrals: 0,
+            referralBonus: 0,
+            referralHistory: [],
+            transactions: [
+                {
+                    id: "init-1",
+                    label: "APEXVERSE PRIME ($APV) Wallet Ready",
+                    amount: "0 $APV",
+                    positive: true,
+                    time: "Ready",
+                },
+            ],
+        };
+
+        let appState = structuredClone(DEFAULT_STATE);
+
+        // DOM References
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const miniAppContainer = document.getElementById('miniAppContainer');
+        const loaderPercentText = document.getElementById('loaderPercentText');
+        const loaderBarFill = document.getElementById('loaderBarFill');
+        const cyanWaveCanvas = document.getElementById('cyanWaveCanvas');
+
+        const subsysContracts = document.getElementById('subsysContracts');
+        const subsysLiquidity = document.getElementById('subsysLiquidity');
+        const subsysNetwork = document.getElementById('subsysNetwork');
+        const dotContracts = document.getElementById('dotContracts');
+        const dotLiquidity = document.getElementById('dotLiquidity');
+        const dotNetwork = document.getElementById('dotNetwork');
+
+        const rankBadgeText = document.getElementById('rankBadgeText');
+        const headerPphValue = document.getElementById('headerPphValue');
+        const headerBalanceValue = document.getElementById('headerBalanceValue');
+        const tapBalanceValue = document.getElementById('tapBalanceValue');
+        const vaultStatValue = document.getElementById('vaultStatValue');
+        const walletBalanceValue = document.getElementById('walletBalanceValue');
+        const energyText = document.getElementById('energyText');
+        const energyBarFill = document.getElementById('energyBarFill');
+        const bottomTapRateValue = document.getElementById('bottomTapRateValue');
+        const heldApvText = document.getElementById('heldApvText');
+
+        const sideProfileStatus = document.getElementById('sideProfileStatus');
+        const sideBoostLv = document.getElementById('sideBoostLv');
+        const modalBoostLv = document.getElementById('modalBoostLv');
+        const sideQuestStatus = document.getElementById('sideQuestStatus');
+        const mineCardsList = document.getElementById('mineCardsList');
+        const comboCardsGrid = document.getElementById('comboCardsGrid');
+        const comboCountBadge = document.getElementById('comboCountBadge');
+        const claimComboBtn = document.getElementById('claimComboBtn');
+
+        const circularTapRingBtn = document.getElementById('circularTapRingBtn');
+        const tapArena = document.getElementById('tapArena');
+
+        const buyCoreUpgradeBtn = document.getElementById('buyCoreUpgradeBtn');
+        const claimQuestBtn = document.getElementById('claimQuestBtn');
+
+        const referralCountText = document.getElementById('referralCountText');
+        const referralBonusText = document.getElementById('referralBonusText');
+        const inviteLinkBox = document.getElementById('inviteLinkBox');
+        const copyInviteBtn = document.getElementById('copyInviteBtn');
+        const recordReferralBtn = document.getElementById('recordReferralBtn');
+        const friendRewardHistory = document.getElementById('friendRewardHistory');
+
+        const connectTonWalletBtn = document.getElementById('connectTonWalletBtn');
+        const walletAddressBadge = document.getElementById('walletAddressBadge');
+        const claimAirdropBtn = document.getElementById('claimAirdropBtn');
+        const tokenTransactionLog = document.getElementById('tokenTransactionLog');
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const apvToast = document.getElementById('apvToast');
+
+        let loaderProgress = 0;
+        let loaderIntervalId = null;
+        let wavePhase = 0;
+        let waveAnimId = null;
+        let audioCtx = null;
+        let suppressNextMouseClick = false;
+        let currentPrice = INITIAL_PRICE;
+        let candles = [];
+
+        function playTapSound(comboIndex = 0) {
+            if (!appState.soundEnabled) return;
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                if (!audioCtx) {
+                    audioCtx = new AudioContextClass();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                const pitchBoost = Math.min(comboIndex * 28, 220);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(520 + pitchBoost, now);
+                osc.frequency.exponentialRampToValueAtTime(980 + pitchBoost, now + 0.055);
+
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.linearRampToValueAtTime(0.14, now + 0.008);
+                gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.068);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.072);
+            } catch (err) {
+                // Ignore Web Audio errors if blocked by browser policy
+            }
+        }
+
+        function applyElapsedPassiveIncome() {
+            const now = Date.now();
+            const last = typeof appState.lastTickTime === 'number' ? appState.lastTickTime : now;
+            const elapsedSec = Math.max(0, Math.min((now - last) / 1000, 86400));
+            appState.lastTickTime = now;
+
+            if (appState.pph > 0 && elapsedSec > 0) {
+                const earned = (appState.pph / 3600) * elapsedSec + (appState.pphFraction || 0);
+                const wholeTokens = Math.floor(earned);
+                appState.pphFraction = earned - wholeTokens;
+                if (wholeTokens > 0) {
+                    appState.balance += wholeTokens;
+                }
+            }
+
+            if (appState.energy < MAX_ENERGY && elapsedSec > 0) {
+                appState.energy = Math.min(MAX_ENERGY, appState.energy + Math.floor(elapsedSec * 2));
+            }
+        }
+
+        function loadStateFromStorage() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    appState = {
+                        ...structuredClone(DEFAULT_STATE),
+                        ...parsed,
+                        profile: {
+                            ...structuredClone(DEFAULT_STATE.profile),
+                            ...(parsed.profile || {}),
+                        },
+                        mineLevels: {
+                            ...structuredClone(DEFAULT_STATE.mineLevels),
+                            ...(parsed.mineLevels || {}),
+                        },
+                        selectedComboIds: Array.isArray(parsed.selectedComboIds) ? parsed.selectedComboIds : [],
+                        redeemedCodes: Array.isArray(parsed.redeemedCodes) ? parsed.redeemedCodes : [],
+                        referralHistory: Array.isArray(parsed.referralHistory) ? parsed.referralHistory : [],
+                        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : structuredClone(DEFAULT_STATE.transactions),
+                    };
+                }
+            } catch (err) {
+                appState = structuredClone(DEFAULT_STATE);
+            }
+            applyElapsedPassiveIncome();
+        }
+
+        function saveStateToStorage() {
+            try {
+                appState.lastTickTime = Date.now();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            } catch (err) {
+                // Ignore storage quota errors
+            }
+        }
+
+        function showToast(message) {
+            apvToast.textContent = message;
+            apvToast.classList.remove('opacity-0');
+            apvToast.classList.add('opacity-100');
+            clearTimeout(apvToast._hideTimer);
+            apvToast._hideTimer = setTimeout(() => {
+                apvToast.classList.remove('opacity-100');
+                apvToast.classList.add('opacity-0');
+            }, 2200);
+        }
+
+        function formatNowTime() {
+            return new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+        }
+
+        function recordTransaction(label, amountStr, positive = true) {
+            appState.transactions.unshift({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                label,
+                amount: amountStr,
+                positive,
+                time: formatNowTime(),
+            });
+            if (appState.transactions.length > 15) {
+                appState.transactions.length = 15;
+            }
+        }
+
+        function positionProfileGuidedArrow() {
+            const arrowEl = document.getElementById('profileGuidedArrow');
+            const profileBtn = document.getElementById('openProfileBtn');
+            const earnTab = document.getElementById('tab-earn');
+            if (!arrowEl || !profileBtn || !earnTab) return;
+
+            const isActive = !miniAppContainer.classList.contains('hidden') && !earnTab.classList.contains('hidden');
+            const needsOnboarding = isActive && !appState.profile.bonusAwarded && !appState.profile.name;
+
+            if (!needsOnboarding) {
+                arrowEl.classList.add('hidden');
+                profileBtn.classList.remove('hud-guide-highlight');
+                return;
+            }
+
+            const rect = profileBtn.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+                arrowEl.classList.add('hidden');
+                return;
+            }
+
+            profileBtn.classList.add('hud-guide-highlight');
+            arrowEl.classList.remove('hidden');
+            arrowEl.style.left = `${rect.left + rect.width / 2}px`;
+            arrowEl.style.top = `${rect.top - 4}px`;
+        }
+
+        function seedCandles() {
+            candles = [];
+            let p = INITIAL_PRICE;
+            for (let i = 0; i < CANDLE_COUNT; i++) {
+                const open = p;
+                const deltaPct = (Math.random() - 0.44) * 0.14;
+                const close = Math.max(0.004, Number((open * (1 + deltaPct)).toFixed(4)));
+                const high = Number((Math.max(open, close) * (1 + Math.random() * 0.05)).toFixed(4));
+                const low = Number((Math.min(open, close) * (1 - Math.random() * 0.05)).toFixed(4));
+                candles.push({ open, close, high, low });
+                p = close;
+            }
+            currentPrice = p;
+        }
+
+        function stepCandleMarket() {
+            if (candles.length === 0) seedCandles();
+            const last = candles[candles.length - 1];
+            const open = last.close;
+            const deltaPct = (Math.random() - 0.43) * 0.13;
+            const close = Math.max(0.004, Number((open * (1 + deltaPct)).toFixed(4)));
+            const high = Number((Math.max(open, close) * (1 + Math.random() * 0.045)).toFixed(4));
+            const low = Number((Math.min(open, close) * (1 - Math.random() * 0.045)).toFixed(4));
+            candles.push({ open, close, high, low });
+            if (candles.length > CANDLE_COUNT) candles.shift();
+            currentPrice = close;
+            renderTradingChart();
+        }
+
+        function renderTradingChart() {
+            const canvas = document.getElementById('apvChartCanvas');
+            const markerEl = document.getElementById('lionChartTipMarker');
+            const priceTextEl = document.getElementById('livePriceText');
+            const changeBadgeEl = document.getElementById('priceChangeBadge');
+            if (!canvas || !canvas.parentElement) return;
+
+            const width = canvas.parentElement.clientWidth;
+            const height = canvas.parentElement.clientHeight;
+            if (width <= 0 || height <= 0) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(width * dpr);
+            canvas.height = Math.floor(height * dpr);
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, width, height);
+
+            if (candles.length === 0) seedCandles();
+
+            let minVal = Infinity;
+            let maxVal = -Infinity;
+            candles.forEach((c) => {
+                if (c.low < minVal) minVal = c.low;
+                if (c.high > maxVal) maxVal = c.high;
+            });
+            if (minVal === maxVal) {
+                minVal *= 0.9;
+                maxVal *= 1.1;
+            }
+
+            const padTop = 8;
+            const padBottom = 8;
+            const padLeft = 6;
+            const padRight = 32;
+            const chartW = Math.max(20, width - padLeft - padRight);
+            const chartH = Math.max(20, height - padTop - padBottom);
+
+            const priceToY = (val) => padTop + chartH * (1 - (val - minVal) / (maxVal - minVal));
+
+            ctx.strokeStyle = "rgba(56, 189, 248, 0.12)";
+            ctx.lineWidth = 1;
+            for (let g = 0; g <= 2; g++) {
+                const gy = padTop + (chartH / 2) * g;
+                ctx.beginPath();
+                ctx.moveTo(padLeft, gy);
+                ctx.lineTo(width - padRight, gy);
+                ctx.stroke();
+            }
+
+            const stepX = chartW / candles.length;
+            const bodyW = Math.max(4, Math.min(11, stepX * 0.56));
+            let lastTipX = padLeft + chartW - stepX / 2;
+            let lastTipY = priceToY(currentPrice);
+
+            candles.forEach((c, idx) => {
+                const cx = padLeft + idx * stepX + stepX / 2;
+                const yHigh = priceToY(c.high);
+                const yLow = priceToY(c.low);
+                const yOpen = priceToY(c.open);
+                const yClose = priceToY(c.close);
+                const isBull = c.close >= c.open;
+
+                ctx.strokeStyle = isBull ? "#34d399" : "#fb7185";
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(cx, yHigh);
+                ctx.lineTo(cx, yLow);
+                ctx.stroke();
+
+                ctx.fillStyle = isBull ? "#10b981" : "#f43f5e";
+                const topY = Math.min(yOpen, yClose);
+                const boxH = Math.max(2, Math.abs(yClose - yOpen));
+                ctx.fillRect(cx - bodyW / 2, topY, bodyW, boxH);
+
+                if (idx === candles.length - 1) {
+                    lastTipX = cx;
+                    lastTipY = yClose;
+                }
+            });
+
+            ctx.restore();
+
+            if (markerEl) {
+                const clampedX = Math.min(width - 16, Math.max(16, lastTipX + 8));
+                const clampedY = Math.min(height - 14, Math.max(14, lastTipY));
+                markerEl.style.left = `${clampedX}px`;
+                markerEl.style.top = `${clampedY}px`;
+                markerEl.style.transform = "translate(-50%, -50%)";
+            }
+
+            if (priceTextEl) priceTextEl.textContent = `$${currentPrice.toFixed(4)}`;
+            if (changeBadgeEl) {
+                const diffPct = ((currentPrice - INITIAL_PRICE) / INITIAL_PRICE) * 100;
+                const sign = diffPct >= 0 ? "+" : "";
+                changeBadgeEl.textContent = `${sign}${diffPct.toFixed(1)}%`;
+                changeBadgeEl.className = diffPct >= 0
+                    ? "font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300"
+                    : "font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300";
+            }
+        }
+
+        function renderMineCards() {
+            mineCardsList.innerHTML = MINE_CARDS.map((card) => {
+                const lv = appState.mineLevels[card.id] || 0;
+                const cost = Math.round(card.baseCost * Math.pow(1.5, lv));
+                return `
+                    <div class="apv-subcard rounded-2xl p-3 flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-white truncate">${card.name} <span class="text-cyan-300 font-mono">Lv.${lv}</span></div>
+                            <div class="text-[10px] text-emerald-300 font-mono truncate">+${card.pphGain} / hr • Cost: ${cost} $APV</div>
+                        </div>
+                        <button
+                            type="button"
+                            data-mine-id="${card.id}"
+                            class="mine-upgrade-btn px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/35 border border-sky-400/50 text-sky-200 font-orbitron text-[10px] font-bold cursor-pointer shrink-0"
+                        >
+                            Upgrade
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            mineCardsList.querySelectorAll('.mine-upgrade-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.mineId;
+                    const card = MINE_CARDS.find((m) => m.id === id);
+                    if (!card) return;
+                    const lv = appState.mineLevels[id] || 0;
+                    const cost = Math.round(card.baseCost * Math.pow(1.5, lv));
+                    if (appState.balance < cost) {
+                        showToast(`Need ${cost} $APV for ${card.name}`);
+                        return;
+                    }
+                    appState.balance -= cost;
+                    appState.mineLevels[id] = lv + 1;
+                    appState.pph += card.pphGain;
+                    recordTransaction(`${card.name} Lv.${lv + 1} (+${card.pphGain}/hr)`, `-${cost} $APV`, false);
+                    saveStateToStorage();
+                    renderDashboard();
+                    showToast(`${card.name} +${card.pphGain} Profit/Hr!`);
+                });
+            });
+        }
+
+        function renderComboCards() {
+            const today = getTodayKey();
+            const claimedToday = appState.comboClaimedDate === today;
+            comboCountBadge.textContent = claimedToday ? "Claimed" : `${appState.selectedComboIds.length} / 3 Selected`;
+
+            comboCardsGrid.innerHTML = COMBO_CARDS.map((card) => {
+                const selected = appState.selectedComboIds.includes(card.id);
+                return `
+                    <button
+                        type="button"
+                        data-combo-id="${card.id}"
+                        class="combo-card-btn py-2 px-1.5 rounded-xl border font-mono text-[10px] font-bold transition cursor-pointer truncate ${
+                            selected
+                                ? 'bg-sky-500/30 border-sky-300 text-white shadow-[0_0_12px_rgba(56,189,248,0.45)]'
+                                : 'bg-slate-950/80 border-sky-400/25 text-slate-300'
+                        }"
+                    >
+                        ${card.name}
+                    </button>
+                `;
+            }).join('');
+
+            comboCardsGrid.querySelectorAll('.combo-card-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    if (claimedToday) {
+                        showToast('Daily Combo already claimed today');
+                        return;
+                    }
+                    const id = btn.dataset.comboId;
+                    const idx = appState.selectedComboIds.indexOf(id);
+                    if (idx >= 0) {
+                        appState.selectedComboIds.splice(idx, 1);
+                    } else if (appState.selectedComboIds.length < 3) {
+                        appState.selectedComboIds.push(id);
+                    } else {
+                        appState.selectedComboIds.shift();
+                        appState.selectedComboIds.push(id);
+                    }
+                    saveStateToStorage();
+                    renderComboCards();
+                });
+            });
+
+            claimComboBtn.textContent = claimedToday ? "Combo Claimed Today" : "Claim Combo (+250 $APV)";
+        }
+
+        function renderDashboard() {
+            const formattedBalance = Math.floor(appState.balance).toLocaleString();
+            headerBalanceValue.textContent = formattedBalance;
+            headerPphValue.textContent = Math.floor(appState.pph).toLocaleString();
+            tapBalanceValue.textContent = formattedBalance;
+            vaultStatValue.textContent = Math.floor(appState.vaultLocked).toLocaleString();
+            walletBalanceValue.textContent = formattedBalance;
+            heldApvText.textContent = Math.floor(appState.heldApv).toLocaleString();
+            rankBadgeText.textContent = getCurrentRankLabel(appState.balance);
+
+            energyText.textContent = `${Math.floor(appState.energy)} / ${MAX_ENERGY}`;
+            energyBarFill.style.width = `${Math.max(0, Math.min(100, (appState.energy / MAX_ENERGY) * 100))}%`;
+
+            bottomTapRateValue.textContent = `+${appState.tapPower}`;
+            sideBoostLv.textContent = `Lv.${appState.coreLevel}`;
+            modalBoostLv.textContent = `Lv. ${appState.coreLevel} (+${appState.tapPower} $APV / tap)`;
+            sideProfileStatus.textContent = appState.profile.name ? appState.profile.name : "+1,000";
+
+            if (inviteLinkBox) {
+                inviteLinkBox.textContent = REFERRAL_LINK_URL;
+            }
+
+            const introBanner = document.getElementById('appIntroBanner');
+            if (introBanner) {
+                introBanner.classList.toggle('hidden', !appState.showAppIntroCard);
+            }
+
+            const profileFormCard = document.getElementById('profileFormCard');
+            const profileSavedCard = document.getElementById('profileSavedCard');
+            const profileBonusBadge = document.getElementById('profileBonusBadge');
+            if (profileBonusBadge) {
+                profileBonusBadge.textContent = appState.profile.bonusAwarded ? "Bonus Claimed" : "+1,000 $APV Bonus";
+            }
+            if (profileFormCard && profileSavedCard) {
+                if (appState.profile.formDismissed && appState.profile.name) {
+                    profileFormCard.classList.add('hidden');
+                    profileSavedCard.classList.remove('hidden');
+                    document.getElementById('profileSavedName').textContent = appState.profile.name;
+                    const meta = [];
+                    if (appState.profile.age) meta.push(`Age: ${appState.profile.age}`);
+                    if (appState.profile.dob) meta.push(`DOB: ${formatEnglishDate(appState.profile.dob)}`);
+                    document.getElementById('profileSavedMeta').textContent = meta.length ? meta.join(" • ") : "APEXVERSE PRIME Member";
+                } else {
+                    profileFormCard.classList.remove('hidden');
+                    profileSavedCard.classList.add('hidden');
+                }
+            }
+
+            soundToggleBtn.textContent = appState.soundEnabled ? 'SFX: ON' : 'SFX: OFF';
+            soundToggleBtn.className = appState.soundEnabled
+                ? 'apv-subcard rounded-xl px-2 py-1 font-mono text-[9px] font-bold text-sky-300 hover:border-sky-400/70 transition cursor-pointer'
+                : 'apv-subcard rounded-xl px-2 py-1 font-mono text-[9px] font-bold text-slate-400 hover:border-sky-400/50 transition cursor-pointer';
+
+            if (appState.dailyQuestClaimed) {
+                sideQuestStatus.textContent = "Done";
+                sideQuestStatus.className = "font-mono text-[8px] text-slate-300";
+            } else {
+                sideQuestStatus.textContent = "Ready";
+                sideQuestStatus.className = "font-mono text-[8px] text-emerald-300";
+            }
+
+            claimQuestBtn.textContent = appState.dailyQuestClaimed ? "Claimed Today" : "Claim +25 $APV";
+
+            if (appState.walletConnected && appState.walletAddress) {
+                connectTonWalletBtn.textContent = "Connected";
+                walletAddressBadge.textContent = `TON Wallet: ${appState.walletAddress}`;
+                walletAddressBadge.className = "font-mono text-[10px] text-emerald-300 truncate";
+            } else {
+                connectTonWalletBtn.textContent = "Connect TON";
+                walletAddressBadge.textContent = "TON Wallet: Not Connected";
+                walletAddressBadge.className = "font-mono text-[10px] text-slate-400 truncate";
+            }
+
+            referralCountText.textContent = appState.referrals.toLocaleString();
+            referralBonusText.textContent = `${appState.referralBonus.toLocaleString()} $APV`;
+
+            renderMineCards();
+            renderComboCards();
+
+            if (appState.referralHistory.length === 0) {
+                friendRewardHistory.innerHTML = `<div class="text-slate-400 py-2">No referrals yet. Share your link to earn +100 $APV.</div>`;
+            } else {
+                friendRewardHistory.innerHTML = appState.referralHistory
+                    .map(
+                        (item) => `
+                        <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950/85 border border-sky-400/20">
+                            <span class="text-slate-200 truncate">${item.friendLabel}</span>
+                            <span class="text-sky-400 font-bold shrink-0">+${item.reward} $APV</span>
+                        </div>`
+                    )
+                    .join('');
+            }
+
+            tokenTransactionLog.innerHTML = appState.transactions
+                .map(
+                    (tx) => `
+                    <div class="flex items-center justify-between gap-2 px-2.5 py-1 rounded-xl bg-slate-950/85 border border-sky-400/20">
+                        <div class="min-w-0">
+                            <div class="text-slate-200 truncate">${tx.label}</div>
+                            <div class="text-[9px] text-slate-500">${tx.time}</div>
+                        </div>
+                        <span class="${tx.positive ? 'text-sky-400' : 'text-amber-300'} font-bold shrink-0">${tx.amount}</span>
+                    </div>`
+                )
+                .join('');
+
+            positionProfileGuidedArrow();
+        }
+
+        function switchNavigationTab(tabKey) {
+            const tabMap = {
+                earn: document.getElementById('tab-earn'),
+                referral: document.getElementById('tab-referral'),
+                wallet: document.getElementById('tab-wallet'),
+            };
+
+            Object.entries(tabMap).forEach(([key, section]) => {
+                if (!section) return;
+                section.classList.toggle('hidden', key !== tabKey);
+            });
+
+            document.querySelectorAll('.apv-nav-btn').forEach((btn) => {
+                const isActive = btn.dataset.nav === tabKey;
+                btn.classList.toggle('nav-btn-active', isActive);
+                btn.classList.toggle('nav-btn-inactive', !isActive);
+            });
+
+            if (tabKey === 'earn') {
+                renderTradingChart();
+            } else if (tabKey === 'wallet') {
+                const banner = document.getElementById('walletLaunchBanner');
+                if (banner) {
+                    banner.classList.add('hud-guide-highlight');
+                    setTimeout(() => banner.classList.remove('hud-guide-highlight'), 1100);
+                }
+            }
+
+            positionProfileGuidedArrow();
+        }
+
+        function setModalOpen(modalId, open) {
+            const el = document.getElementById(modalId);
+            if (!el) return;
+            el.classList.toggle('hidden', !open);
+        }
+
+        function spawnFloatingTapBadge(clientX, clientY, amount) {
+            const rect = tapArena.getBoundingClientRect();
+            const offsetX = typeof clientX === 'number' && clientX > 0 ? clientX - rect.left : rect.width / 2;
+            const offsetY = typeof clientY === 'number' && clientY > 0 ? clientY - rect.top : rect.height / 2;
+
+            const badge = document.createElement('div');
+            badge.className = 'floating-circular-badge flex flex-col items-center';
+            badge.style.left = `${offsetX}px`;
+            badge.style.top = `${offsetY}px`;
+            badge.innerHTML = `
+                <span class="px-1.5 py-0.5 rounded bg-sky-950/95 border border-sky-300/85 font-orbitron text-[10px] font-black text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.95)] leading-none mb-0.5">+${amount}</span>
+                <div class="w-10 h-10 rounded-full overflow-hidden border-2 border-sky-300 bg-[#06101e] shadow-[0_0_20px_rgba(56,189,248,0.9)] flex items-center justify-center">
+                    <img
+                        src="${TAP_BADGE_IMAGE_URL}"
+                        alt="+${amount} $APV"
+                        class="w-full h-full object-cover object-center"
+                        onerror="this.onerror=null; this.src='https://placehold.co/80x80/06101e/38bdf8?text=+10';"
+                    />
+                </div>
+            `;
+
+            tapArena.appendChild(badge);
+            setTimeout(() => badge.remove(), 830);
+        }
+
+        function handleSingleTapHit(point) {
+            if (appState.energy < appState.tapPower) {
+                showToast('Not enough energy! Claim Daily Check-In or wait');
+                return false;
+            }
+
+            appState.energy = Math.max(0, appState.energy - appState.tapPower);
+            appState.balance += appState.tapPower;
+
+            try {
+                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                    window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                }
+            } catch (e) {
+                // Ignore outside Telegram
+            }
+
+            circularTapRingBtn.classList.remove('tap-ring-press');
+            void circularTapRingBtn.offsetWidth;
+            circularTapRingBtn.classList.add('tap-ring-press');
+
+            const ptX = point && typeof point.clientX === 'number' ? point.clientX : null;
+            const ptY = point && typeof point.clientY === 'number' ? point.clientY : null;
+            spawnFloatingTapBadge(ptX, ptY, appState.tapPower);
+            return true;
+        }
+
+        function processMultiTapHits(hits) {
+            if (!Array.isArray(hits) || hits.length === 0) return;
+            let registeredCount = 0;
+
+            for (let i = 0; i < hits.length; i++) {
+                const ok = handleSingleTapHit(hits[i]);
+                if (!ok) break;
+                playTapSound(registeredCount);
+                registeredCount += 1;
+            }
+
+            if (registeredCount > 0) {
+                saveStateToStorage();
+                renderDashboard();
+            }
+        }
+
+        // Passive PPH accrual, energy recharge, and chart price updates
+        setInterval(() => {
+            if (!loadingOverlay.classList.contains('hidden')) return;
+            applyElapsedPassiveIncome();
+            saveStateToStorage();
+            renderDashboard();
+        }, 1000);
+
+        setInterval(() => {
+            if (!loadingOverlay.classList.contains('hidden')) return;
+            stepCandleMarket();
+        }, 2500);
+
+        /* =====================================================================
+           LOADER SUBSYSTEMS & CYAN WAVE ENGINE (0% -> 100% ANALYZING)
+           ===================================================================== */
+        function updateLoaderSubsystems(pct) {
+            if (pct >= 0) {
+                subsysContracts.className = 'flex items-center gap-1.5 text-cyan-200';
+                dotContracts.className = 'w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] shrink-0';
+            }
+            if (pct >= 38) {
+                subsysLiquidity.className = 'flex items-center gap-1.5 text-cyan-200';
+                dotLiquidity.className = 'w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] shrink-0';
+            }
+            if (pct >= 72) {
+                subsysNetwork.className = 'flex items-center gap-1.5 text-cyan-200';
+                dotNetwork.className = 'w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] shrink-0';
+            }
+        }
+
+        function resizeCyanCanvas() {
+            if (!cyanWaveCanvas) return;
+            cyanWaveCanvas.width = window.innerWidth;
+            cyanWaveCanvas.height = window.innerHeight;
+        }
+
+        function renderLowerWave() {
+            if (!cyanWaveCanvas || loadingOverlay.classList.contains('hidden')) return;
+            const ctx = cyanWaveCanvas.getContext('2d');
+            const w = cyanWaveCanvas.width;
+            const h = cyanWaveCanvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            const anchorY = h * 0.84;
+            wavePhase += 0.045;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(0, anchorY);
+            for (let x = 0; x <= w; x += 12) {
+                const y =
+                    anchorY +
+                    Math.sin(x * 0.012 + wavePhase) * 7 +
+                    Math.cos(x * 0.025 - wavePhase * 1.3) * 4;
+                ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = 'rgba(34, 211, 238, 0.36)';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#00d2ff';
+            ctx.shadowBlur = 14;
+            ctx.stroke();
+            ctx.restore();
+
+            waveAnimId = requestAnimationFrame(renderLowerWave);
+        }
+
+        function lockZoomAfterLoad() {
+            document.body.classList.add('app-zoom-locked');
+            document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+            document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
+            document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
+        }
+
+        function completeLoadingTransition() {
+            clearInterval(loaderIntervalId);
+            cancelAnimationFrame(waveAnimId);
+
+            loadingOverlay.classList.add('hidden');
+            miniAppContainer.classList.remove('hidden');
+            lockZoomAfterLoad();
+            switchNavigationTab('earn');
+            renderDashboard();
+            renderTradingChart();
+        }
+
+        function startStaticLoader() {
+            clearInterval(loaderIntervalId);
+            cancelAnimationFrame(waveAnimId);
+
+            loaderProgress = 0;
+            loaderPercentText.textContent = '0%';
+            loaderBarFill.style.width = '0%';
+            updateLoaderSubsystems(0);
+
+            miniAppContainer.classList.add('hidden');
+            loadingOverlay.classList.remove('hidden');
+
+            resizeCyanCanvas();
+            renderLowerWave();
+
+            loaderIntervalId = setInterval(() => {
+                loaderProgress += 1;
+                if (loaderProgress > 100) loaderProgress = 100;
+
+                loaderPercentText.textContent = `${loaderProgress}%`;
+                loaderBarFill.style.width = `${loaderProgress}%`;
+                updateLoaderSubsystems(loaderProgress);
+
+                if (loaderProgress >= 100) {
+                    clearInterval(loaderIntervalId);
+                    setTimeout(completeLoadingTransition, 240);
+                }
+            }, 30);
+        }
+
+        /* =====================================================================
+           EVENT LISTENERS
+           ===================================================================== */
+        circularTapRingBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            suppressNextMouseClick = true;
+            const hits = [];
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                hits.push({ clientX: t.clientX, clientY: t.clientY });
+            }
+            processMultiTapHits(hits);
+        }, { passive: false });
+
+        circularTapRingBtn.addEventListener('click', (e) => {
+            if (suppressNextMouseClick) {
+                suppressNextMouseClick = false;
+                return;
+            }
+            processMultiTapHits([{ clientX: e.clientX, clientY: e.clientY }]);
+        });
+
+        soundToggleBtn.addEventListener('click', () => {
+            appState.soundEnabled = !appState.soundEnabled;
+            if (appState.soundEnabled) {
+                playTapSound(2);
+            }
+            saveStateToStorage();
+            renderDashboard();
+            showToast(appState.soundEnabled ? 'Tap sound enabled' : 'Tap sound muted');
+        });
+
+        document.getElementById('openProfileBtn').addEventListener('click', () => {
+            document.getElementById('profileNameInput').value = appState.profile.name || "";
+            document.getElementById('profileAgeInput').value = appState.profile.age || "";
+            document.getElementById('profileDobInput').value = appState.profile.dob || "";
+            setModalOpen('profileModal', true);
+        });
+
+        document.getElementById('saveProfileBtn').addEventListener('click', () => {
+            const nameVal = (document.getElementById('profileNameInput').value || "").trim();
+            const ageVal = (document.getElementById('profileAgeInput').value || "").trim();
+            const dobVal = (document.getElementById('profileDobInput').value || "").trim();
+
+            if (!nameVal) {
+                showToast('Please enter your Name');
+                return;
+            }
+
+            appState.profile.name = nameVal;
+            appState.profile.age = ageVal;
+            appState.profile.dob = dobVal;
+            appState.profile.formDismissed = true;
+            appState.showAppIntroCard = true;
+
+            if (!appState.profile.bonusAwarded) {
+                appState.profile.bonusAwarded = true;
+                appState.balance += PROFILE_BONUS_REWARD;
+                recordTransaction(`Profile Saved (${nameVal})`, `+${PROFILE_BONUS_REWARD.toLocaleString()} $APV`, true);
+                saveStateToStorage();
+                setModalOpen('profileModal', false);
+                switchNavigationTab('earn');
+                renderDashboard();
+                showToast('Profile saved! +1,000 $APV awarded');
+            } else {
+                saveStateToStorage();
+                setModalOpen('profileModal', false);
+                switchNavigationTab('earn');
+                renderDashboard();
+                showToast('Profile saved!');
+            }
+        });
+
+        document.getElementById('editProfileBtn').addEventListener('click', () => {
+            appState.profile.formDismissed = false;
+            saveStateToStorage();
+            renderDashboard();
+        });
+
+        document.getElementById('dismissAppIntroBtn').addEventListener('click', () => {
+            appState.showAppIntroCard = false;
+            saveStateToStorage();
+            renderDashboard();
+        });
+
+        document.getElementById('openMyCodeBtn').addEventListener('click', () => setModalOpen('myCodeModal', true));
+        document.getElementById('redeemBonusCodeBtn').addEventListener('click', () => {
+            const code = (document.getElementById('bonusCodeInput').value || "").trim().toUpperCase();
+            if (!code) {
+                showToast('Enter code APEX100');
+                return;
+            }
+            if (code !== 'APEX100') {
+                showToast('Invalid code. Try APEX100');
+                return;
+            }
+            if (appState.redeemedCodes.includes(code)) {
+                showToast('APEX100 already claimed');
+                return;
+            }
+            appState.redeemedCodes.push(code);
+            appState.balance += 100;
+            recordTransaction('Code APEX100', '+100 $APV', true);
+            saveStateToStorage();
+            setModalOpen('myCodeModal', false);
+            renderDashboard();
+            showToast('Claimed +100 $APV!');
+        });
+
+        document.getElementById('openBoostModalBtn').addEventListener('click', () => setModalOpen('boostModal', true));
+        document.getElementById('openQuestModalBtn').addEventListener('click', () => setModalOpen('questModal', true));
+        document.querySelectorAll('[data-close-modal]').forEach((btn) => {
+            btn.addEventListener('click', () => setModalOpen(btn.dataset.closeModal, false));
+        });
+
+        document.querySelectorAll('.apv-nav-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                switchNavigationTab(btn.dataset.nav);
+            });
+        });
+
+        buyCoreUpgradeBtn.addEventListener('click', () => {
+            if (appState.balance < 100) {
+                showToast('Need 100 $APV for Tap Multiplier');
+                return;
+            }
+            appState.balance -= 100;
+            appState.coreLevel += 1;
+            appState.tapPower += 5;
+            recordTransaction(`Tap Multiplier Lv.${appState.coreLevel}`, '-100 $APV', false);
+            saveStateToStorage();
+            renderDashboard();
+            showToast(`Tap boosted to +${appState.tapPower} $APV!`);
+        });
+
+        claimQuestBtn.addEventListener('click', () => {
+            if (appState.dailyQuestClaimed) {
+                showToast('Daily Check-In already claimed');
+                return;
+            }
+            appState.dailyQuestClaimed = true;
+            appState.balance += 25;
+            appState.energy = MAX_ENERGY;
+            recordTransaction('Daily Check-In', '+25 $APV', true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast('Claimed +25 $APV & full energy!');
+        });
+
+        claimComboBtn.addEventListener('click', () => {
+            const today = getTodayKey();
+            if (appState.comboClaimedDate === today) {
+                showToast('Daily Combo already claimed today');
+                return;
+            }
+            if (appState.selectedComboIds.length < 3) {
+                showToast('Select 3 combo cards first');
+                return;
+            }
+            appState.comboClaimedDate = today;
+            appState.balance += 250;
+            recordTransaction('Daily Combo Reward', '+250 $APV', true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast('Claimed +250 $APV Daily Combo!');
+        });
+
+        // Trading Mini-Game: BUY / SELL / VAULT
+        document.getElementById('buyApvBtn').addEventListener('click', () => {
+            const amt = Math.max(1, Math.floor(Number(document.getElementById('tradeAmountInput').value || 0)));
+            if (appState.balance < amt) {
+                showToast('Insufficient $APV balance to buy');
+                return;
+            }
+            appState.balance -= amt;
+            appState.heldApv += amt;
+            recordTransaction(`Buy @ $${currentPrice.toFixed(4)}`, `+${amt} HELD`, true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast(`Bought ${amt} $APV position @ $${currentPrice.toFixed(4)}`);
+        });
+
+        document.getElementById('sellApvBtn').addEventListener('click', () => {
+            const amt = Math.max(1, Math.floor(Number(document.getElementById('tradeAmountInput').value || 0)));
+            if (appState.heldApv < amt) {
+                showToast('Insufficient held $APV to sell');
+                return;
+            }
+            const factor = Math.max(0.85, Math.min(1.35, currentPrice / INITIAL_PRICE));
+            const returned = Math.max(1, Math.round(amt * factor));
+            appState.heldApv -= amt;
+            appState.balance += returned;
+            recordTransaction(`Sell @ $${currentPrice.toFixed(4)}`, `+${returned} $APV`, true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast(`Sold ${amt} $APV for ${returned} $APV`);
+        });
+
+        document.getElementById('lockVaultBtn').addEventListener('click', () => {
+            const amt = Math.max(1, Math.floor(Number(document.getElementById('tradeAmountInput').value || 0)));
+            if (appState.balance < amt) {
+                showToast('Insufficient $APV balance for Vault');
+                return;
+            }
+            appState.balance -= amt;
+            appState.vaultLocked += amt;
+            recordTransaction('Locked in Launch Vault', `${amt} $APV`, false);
+            saveStateToStorage();
+            renderDashboard();
+            showToast(`Locked ${amt} $APV in Launch Vault`);
+        });
+
+        copyInviteBtn.addEventListener('click', () => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(REFERRAL_LINK_URL)
+                    .then(() => showToast('Referral link copied!'))
+                    .catch(() => showToast('Referral link ready'));
+            } else {
+                const tempInput = document.createElement('input');
+                tempInput.value = REFERRAL_LINK_URL;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                try { document.execCommand('copy'); } catch (e) {}
+                document.body.removeChild(tempInput);
+                showToast('Referral link copied!');
+            }
+        });
+
+        recordReferralBtn.addEventListener('click', () => {
+            appState.referrals += 1;
+            appState.referralBonus += REFERRAL_TOKEN_REWARD;
+            appState.balance += REFERRAL_TOKEN_REWARD;
+
+            appState.referralHistory.unshift({
+                friendLabel: `Friend #${appState.referrals}`,
+                reward: REFERRAL_TOKEN_REWARD,
+            });
+            recordTransaction(`Referral #${appState.referrals}`, `+${REFERRAL_TOKEN_REWARD} $APV`, true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast(`+${REFERRAL_TOKEN_REWARD} $APV referral credited!`);
+        });
+
+        connectTonWalletBtn.addEventListener('click', () => {
+            if (appState.walletConnected) {
+                appState.walletConnected = false;
+                appState.walletAddress = "";
+                saveStateToStorage();
+                renderDashboard();
+                showToast('TON Wallet disconnected');
+                return;
+            }
+            const tgId = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user && window.Telegram.WebApp.initDataUnsafe.user.id)
+                ? String(window.Telegram.WebApp.initDataUnsafe.user.id).slice(-4).padStart(4, '0')
+                : '9A2F';
+            appState.walletConnected = true;
+            appState.walletAddress = `UQ...${tgId}APV`;
+            recordTransaction('TON Wallet Connected', 'Linked', true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast('TON Wallet connected!');
+        });
+
+        claimAirdropBtn.addEventListener('click', () => {
+            appState.balance += 50;
+            recordTransaction('Wallet Claim', '+50 $APV', true);
+            saveStateToStorage();
+            renderDashboard();
+            showToast('Claimed +50 $APV!');
+        });
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 280) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
+
+        window.addEventListener('resize', () => {
+            resizeCyanCanvas();
+            positionProfileGuidedArrow();
+            renderTradingChart();
+        });
+
+        window.onload = function () {
+            try {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+            } catch (e) {
+                // Ignore outside Telegram
+            }
+
+            seedCandles();
+            loadStateFromStorage();
+            renderDashboard();
+            startStaticLoader();
+        };
+    </script>
+</body>
+</html>
+```
